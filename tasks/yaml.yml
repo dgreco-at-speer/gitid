@@ -1,0 +1,25 @@
+---
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+tasks:
+  default:
+    desc: List tasks
+    silent: true
+    cmds:
+      - task -t tasks/yaml.yml --list
+
+  check:
+    desc: Check YAML files for linting/formatting errors
+    silent: true
+    cmds:
+      - yamllint --strict .
+      - yamlfmt -lint .
+
+  format:
+    desc: Fix linting/formatting errors in YAML files
+    silent: true
+    aliases:
+      - fmt
+    cmds:
+      - yamlfmt -q .

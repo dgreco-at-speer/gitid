@@ -1,0 +1,18 @@
+# gitid PowerShell hook. Add to $PROFILE:
+#   Invoke-Expression (& gitid hook powershell | Out-String)
+$script:__gitidPwd = $null
+function global:__gitid_hook {
+  if ($script:__gitidPwd -ne $PWD.Path) {
+    $script:__gitidPwd = $PWD.Path
+    $out = (& {{GITID}} env --shell powershell | Out-String)
+    if ($out) { Invoke-Expression $out }
+  }
+}
+if (-not $script:__gitidOrigPrompt) {
+  $script:__gitidOrigPrompt = $function:prompt
+  function global:prompt {
+    __gitid_hook
+    & $script:__gitidOrigPrompt
+  }
+}
+__gitid_hook

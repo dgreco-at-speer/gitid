@@ -1,0 +1,24 @@
+---
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+tasks:
+  default:
+    desc: List tasks
+    silent: true
+    cmds:
+      - task -t tasks/toml.yml --list
+
+  check:
+    desc: Lint TOML files
+    silent: true
+    cmds:
+      - taplo check .
+      - taplo format --check .
+  format:
+    desc: Fix TOML files
+    silent: true
+    aliases:
+      - fmt
+    cmds:
+      - taplo format .

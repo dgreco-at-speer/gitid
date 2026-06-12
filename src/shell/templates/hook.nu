@@ -1,0 +1,15 @@
+# gitid nushell hook. Save to your autoload dir:
+#   gitid hook nu | save -f ($nu.data-dir | path join vendor/autoload/gitid.nu)
+$env.config = ($env.config | upsert hooks.env_change.PWD {
+  |config| ($config.hooks.env_change.PWD? | default []) ++ [{
+    condition: {|| true }
+    code: "
+      let _gitid_out = (^{{GITID}} env --shell nu | str trim)
+      if ($_gitid_out | is-not-empty) {
+        let _gitid = ($_gitid_out | from json)
+        load-env $_gitid.set
+        $_gitid.unset | each {|n| hide-env --ignore-errors $n }
+      }
+    "
+  }]
+})

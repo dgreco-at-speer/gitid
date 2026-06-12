@@ -1,0 +1,56 @@
+---
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+includes:
+  yaml: ./tasks/yaml.yml
+  toml: ./tasks/toml.yml
+  rust: ./tasks/rust.yml
+
+tasks:
+  default:
+    desc: List tasks
+    silent: true
+    cmds:
+      - task --list
+
+  clean:
+    desc: Clean the project
+    silent: true
+    deps:
+      - rust:clean
+    cmds: []
+
+  build:
+    desc: Build the project
+    silent: true
+    deps:
+      - rust:build
+    cmds: []
+
+  test:
+    desc: Test the project
+    silent: true
+    deps:
+      - rust:test
+    cmds: []
+
+  check:
+    desc: Check for linting/formatting errors
+    silent: true
+    deps:
+      - yaml:check
+      - toml:check
+      - rust:check
+    cmds: []
+
+  fix:
+    desc: Fix linting/formatting errors
+    silent: true
+    aliases:
+      - fmt
+    deps:
+      - yaml:format
+      - toml:format
+      - rust:format
+    cmds: []

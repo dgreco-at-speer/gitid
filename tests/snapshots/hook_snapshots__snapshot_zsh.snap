@@ -1,0 +1,11 @@
+---
+source: tests/hook_snapshots.rs
+expression: "hook(\"zsh\")"
+---
+# gitid zsh hook. Add to ~/.zshrc:  eval "$(gitid hook zsh)"
+autoload -Uz add-zsh-hook
+_gitid_hook() {
+  eval "$(gitid env --shell zsh)"
+}
+add-zsh-hook chpwd _gitid_hook
+_gitid_hook

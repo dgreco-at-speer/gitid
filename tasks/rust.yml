@@ -1,0 +1,47 @@
+---
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+tasks:
+  default:
+    desc: List tasks
+    silent: true
+    cmds:
+      - task -t tasks/rust.yml --list
+
+  clean:
+    desc: Clean build artifacts
+    silent: true
+    deps: []
+    cmds:
+      - cargo clean
+
+  build:
+    desc: Build the project
+    silent: true
+    deps: []
+    cmds:
+      - cargo build
+
+  test:
+    desc: Test the project
+    silent: true
+    deps: []
+    cmds:
+      - cargo test
+
+  check:
+    desc: Check for linting/formatting errors
+    silent: true
+    cmds:
+      - cargo clippy
+      - cargo fmt --check --all
+
+  format:
+    desc: Fix linting/formatting errors
+    silent: true
+    aliases:
+      - fmt
+    cmds:
+      - cargo clippy --fix
+      - cargo fmt --all
