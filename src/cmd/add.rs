@@ -29,7 +29,7 @@ pub fn run(ctx: &Ctx, args: &AddArgs) -> Result<()> {
     profiles::upsert_profile(&mut doc, &name, &profile)?;
     profiles::save_doc(&path, &doc)?;
 
-    let report = sync_all(&ctx.paths)?;
+    let report = output::with_spinner("syncing…", || sync_all(&ctx.paths))?;
     output::success(&format!("added profile {name:?}"));
     crate::cmd::sync::report_changes(&report);
     Ok(())

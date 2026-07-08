@@ -7,7 +7,7 @@ use crate::output;
 use crate::sync::{SyncReport, sync_all};
 
 pub fn run(ctx: &Ctx) -> Result<()> {
-    let report = sync_all(&ctx.paths)?;
+    let report = output::with_spinner("syncing…", || sync_all(&ctx.paths))?;
     report_changes(&report);
     Ok(())
 }
@@ -15,7 +15,7 @@ pub fn run(ctx: &Ctx) -> Result<()> {
 pub fn init(ctx: &Ctx) -> Result<()> {
     std::fs::create_dir_all(&ctx.paths.config_dir)?;
     std::fs::create_dir_all(&ctx.paths.data_dir)?;
-    let report = sync_all(&ctx.paths)?;
+    let report = output::with_spinner("initialising…", || sync_all(&ctx.paths))?;
     output::success(&format!(
         "initialised gitid (config: {}, data: {})",
         ctx.paths.config_dir.display(),

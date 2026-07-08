@@ -34,11 +34,14 @@ pub fn run(ctx: &Ctx, args: &ListArgs) -> Result<()> {
                 );
                 return Ok(());
             }
+            let mut active_row = None;
             let rows: Vec<Vec<String>> = profiles
                 .profiles
                 .iter()
-                .map(|(name, p)| {
+                .enumerate()
+                .map(|(i, (name, p))| {
                     let marker = if active.as_deref() == Some(name) {
+                        active_row = Some(i);
                         "●"
                     } else {
                         " "
@@ -55,7 +58,11 @@ pub fn run(ctx: &Ctx, args: &ListArgs) -> Result<()> {
                 .collect();
             print!(
                 "{}",
-                output::table(&["", "NAME", "GIT NAME", "EMAIL", "GH"], &rows)
+                output::table_with_active(
+                    &["", "NAME", "GIT NAME", "EMAIL", "GH"],
+                    &rows,
+                    active_row,
+                )
             );
         }
     }

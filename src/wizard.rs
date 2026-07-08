@@ -1,13 +1,16 @@
 //! Interactive prompts for `gitid add`. Falls back to flag values as defaults.
 
-use std::path::Path;
+use std::fmt;
 
 use anyhow::{Result, bail};
 use inquire::{Confirm, Select, Text};
 
 use crate::cli::AddArgs;
 use crate::cmd::Ctx;
+use crate::ssh::SshKey;
 use crate::store::profiles::{Gh, Profile, Signing, SigningFormat, Ssh};
+
+const NAV_HELP: &str = "type to filter · ↑↓ to move · enter to select";
 
 /// Build a profile interactively, using any supplied flags as defaults.
 pub fn add_wizard(ctx: &Ctx, args: &AddArgs) -> Result<Profile> {
@@ -48,28 +51,52 @@ pub fn add_wizard(ctx: &Ctx, args: &AddArgs) -> Result<Profile> {
     })
 }
 
+/// One entry in the SSH-key picker: a discovered key or one of two sentinels.
+enum SshChoice {
+    Key(SshKey),
+    None,
+    Enter,
+}
+
+impl fmt::Display for SshChoice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SshChoice::Key(k) => write!(f, "{k}"),
+            SshChoice::None => write!(f, "(none)"),
+            SshChoice::Enter => write!(f, "(enter a path…)"),
+        }
+    }
+}
+
 fn prompt_ssh_key(ctx: &Ctx, args: &AddArgs) -> Result<Option<Ssh>> {
     if let Some(key) = &args.ssh_key {
         return Ok(Some(Ssh { key: key.clone() }));
     }
-    let mut options = discover_ssh_keys(&ctx.paths.home);
-    options.push("(none)".to_string());
-    options.push("(enter a path)".to_string());
-    let choice = Select::new("SSH key for this identity:", options).prompt()?;
-    match choice.as_str() {
-        "(none)" => Ok(None),
-        "(enter a path)" => {
+    let mut options: Vec<SshChoice> = crate::ssh::discover(&ctx.paths.home)
+        .into_iter()
+        .map(SshChoice::Key)
+        .collect();
+    options.push(SshChoice::None);
+    options.push(SshChoice::Enter);
+    let page = options.len().clamp(3, 12);
+    let choice = Select::new("SSH key for this identity:", options)
+        .with_help_message(NAV_HELP)
+        .with_page_size(page)
+        .prompt()?;
+    match choice {
+        SshChoice::None => Ok(None),
+        SshChoice::Enter => {
             let key = Text::new("Path to SSH private key:").prompt()?;
             Ok(Some(Ssh { key }))
         }
-        key => Ok(Some(Ssh {
-            key: key.to_string(),
-        })),
+        SshChoice::Key(k) => Ok(Some(Ssh { key: k.path })),
     }
 }
 
 fn prompt_signing(ssh: Option<&Ssh>) -> Result<Option<Signing>> {
-    let choice = Select::new("Commit signing:", vec!["none", "ssh", "openpgp"]).prompt()?;
+    let choice = Select::new("Commit signing:", vec!["none", "ssh", "openpgp"])
+        .with_help_message(NAV_HELP)
+        .prompt()?;
     let format = match choice {
         "none" => return Ok(None),
         "ssh" => SigningFormat::Ssh,
@@ -94,21 +121,4 @@ fn prompt_signing(ssh: Option<&Ssh>) -> Result<Option<Signing>> {
         commits,
         tags: None,
     }))
-}
-
-/// List candidate private keys in `~/.ssh` (files starting with `id_`, excluding
-/// `.pub`).
-fn discover_ssh_keys(home: &Path) -> Vec<String> {
-    let mut keys = Vec::new();
-    let ssh_dir = home.join(".ssh");
-    if let Ok(entries) = std::fs::read_dir(&ssh_dir) {
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if name.starts_with("id_") && !name.ends_with(".pub") {
-                keys.push(entry.path().to_string_lossy().into_owned());
-            }
-        }
-    }
-    keys.sort();
-    keys
 }

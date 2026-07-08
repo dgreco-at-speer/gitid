@@ -284,10 +284,12 @@ fn check_gh(ctx: &Ctx, r: &mut Report) {
     if !any_gh {
         return;
     }
-    let gh_present = Command::new("gh")
-        .arg("--version")
-        .output()
-        .is_ok_and(|o| o.status.success());
+    let gh_present = crate::output::with_spinner("checking gh…", || {
+        Command::new("gh")
+            .arg("--version")
+            .output()
+            .is_ok_and(|o| o.status.success())
+    });
     if !gh_present {
         r.check(
             Status::Warn,

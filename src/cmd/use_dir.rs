@@ -51,7 +51,7 @@ pub fn run(ctx: &Ctx, args: &UseArgs) -> Result<()> {
     });
     mappings.save(&ctx.paths.mappings_toml())?;
 
-    let report = sync_all(&ctx.paths)?;
+    let report = output::with_spinner("syncing…", || sync_all(&ctx.paths))?;
     output::success(&format!(
         "{} now uses profile {:?}",
         canonical_norm.trim_end_matches('/'),
@@ -79,7 +79,7 @@ pub fn forget(ctx: &Ctx, args: &ForgetArgs) -> Result<()> {
     }
     mappings.save(&ctx.paths.mappings_toml())?;
 
-    let report = sync_all(&ctx.paths)?;
+    let report = output::with_spinner("syncing…", || sync_all(&ctx.paths))?;
     output::success(&format!("forgot {}", dir_norm.trim_end_matches('/')));
     crate::cmd::sync::report_changes(&report);
     Ok(())

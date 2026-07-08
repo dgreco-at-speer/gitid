@@ -24,11 +24,12 @@ pub fn run(ctx: &Ctx, args: &ShowArgs) -> Result<()> {
             println!("{}", serde_json::to_string_pretty(profile)?);
         }
         DetailFormat::Pretty => {
-            println!("profile: {}", args.name);
-            println!("  name:   {}", profile.name);
-            println!("  email:  {}", profile.email);
+            use crate::output::dim;
+            println!("{} {}", dim("profile:"), args.name);
+            println!("  {}   {}", dim("name:"), profile.name);
+            println!("  {}  {}", dim("email:"), profile.email);
             if let Some(ssh) = &profile.ssh {
-                println!("  ssh:    {}", ssh.key);
+                println!("  {}    {}", dim("ssh:"), ssh.key);
             }
             if let Some(signing) = &profile.signing {
                 let fmt = match signing.format {
@@ -36,19 +37,26 @@ pub fn run(ctx: &Ctx, args: &ShowArgs) -> Result<()> {
                     SigningFormat::Openpgp => "openpgp",
                 };
                 println!(
-                    "  signing: {fmt} key={} commits={}",
-                    signing.key, signing.commits
+                    "  {} {fmt} key={} commits={}",
+                    dim("signing:"),
+                    signing.key,
+                    signing.commits
                 );
             }
             println!(
-                "  gh:     {}",
+                "  {}     {}",
+                dim("gh:"),
                 if profile.gh_enabled() {
                     "enabled"
                 } else {
                     "disabled"
                 }
             );
-            println!("  fragment: {}", ctx.paths.fragment(&args.name).display());
+            println!(
+                "  {} {}",
+                dim("fragment:"),
+                ctx.paths.fragment(&args.name).display()
+            );
 
             let mappings = MappingsFile::load(&ctx.paths.mappings_toml())?;
             let dirs: Vec<&str> = mappings
@@ -58,7 +66,7 @@ pub fn run(ctx: &Ctx, args: &ShowArgs) -> Result<()> {
                 .map(|m| m.dir.as_str())
                 .collect();
             if !dirs.is_empty() {
-                println!("  directories:");
+                println!("  {}", crate::output::dim("directories:"));
                 for d in dirs {
                     println!("    {d}");
                 }

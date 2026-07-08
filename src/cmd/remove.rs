@@ -52,7 +52,7 @@ pub fn run(ctx: &Ctx, args: &RemoveArgs) -> Result<()> {
     profiles::remove_profile(&mut doc, &args.name);
     profiles::save_doc(&profiles_path, &doc)?;
 
-    let report = sync_all(&ctx.paths)?;
+    let report = output::with_spinner("syncing…", || sync_all(&ctx.paths))?;
     output::success(&format!("removed profile {:?}", args.name));
 
     // The gh config dir holds auth tokens; never delete it implicitly.

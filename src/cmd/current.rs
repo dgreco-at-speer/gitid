@@ -48,10 +48,11 @@ pub fn run(ctx: &Ctx, args: &CurrentArgs) -> Result<ExitCode> {
             );
         }
         CurrentFormat::Pretty => {
-            println!("profile: {}", mapping.profile);
+            use crate::output::dim;
+            println!("{} {}", dim("profile:"), mapping.profile);
             if let Some(p) = profile {
-                println!("  name:  {}", p.name);
-                println!("  email: {}", p.email);
+                println!("  {}  {}", dim("name:"), p.name);
+                println!("  {} {}", dim("email:"), p.email);
             }
             // Cross-check against git's actual resolution in a repo.
             if is_in_repo(&abs) {

@@ -66,7 +66,7 @@ pub fn run(ctx: &Ctx, args: &EditArgs) -> Result<()> {
     profiles::upsert_profile(&mut doc, &args.name, &updated)?;
     profiles::save_doc(&path, &doc)?;
 
-    let report = sync_all(&ctx.paths)?;
+    let report = output::with_spinner("syncing…", || sync_all(&ctx.paths))?;
     output::success(&format!("updated profile {:?}", args.name));
     crate::cmd::sync::report_changes(&report);
     Ok(())

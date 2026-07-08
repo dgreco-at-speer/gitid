@@ -11,6 +11,7 @@ pub mod gitconfig;
 pub mod output;
 pub mod paths;
 pub mod shell;
+pub mod ssh;
 pub mod store;
 pub mod sync;
 pub mod wizard;
