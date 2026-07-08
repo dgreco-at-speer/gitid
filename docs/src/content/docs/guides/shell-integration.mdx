@@ -1,0 +1,187 @@
+---
+title: Shell integration
+description: Install the gitid shell hook for per-profile GitHub CLI auth and prompt integration, plus shell completions for bash, zsh, fish, PowerShell, and nushell.
+---
+
+import { Tabs, TabItem, Aside } from "@astrojs/starlight/components";
+
+gitid's identity switching — `user.name`, `user.email`, `core.sshCommand`,
+signing — is carried entirely by git conditional includes. **It works without
+any shell integration.**
+
+The shell hook exists for the things git config cannot carry:
+
+- **`GH_CONFIG_DIR`** — each profile with gh isolation enabled gets its own
+  GitHub CLI config dir, so `gh` in a work tree uses your work login and `gh`
+  in a personal tree uses your personal one.
+- **`GITID_PROFILE`** — the active profile name, for your prompt.
+- Any extra variables you declare in a profile's `[env]` table.
+
+The hook runs on directory change, resolves the directory→profile mapping,
+and exports (or restores) the right variables. It is cheap: it only does work
+when the directory actually changes and prints nothing when the active
+profile is unchanged.
+
+<Aside type="note">
+Under the hood the hook calls `gitid env --shell <shell>` — the hot path that
+prints the export/unset statements. You never run `gitid env` yourself; its
+output is meant to be evaluated by the hook, not executed for side effects.
+(Setting `GITID_DISABLE` to any non-empty value makes it emit nothing — a
+kill switch.)
+</Aside>
+
+## Automatic install: `gitid setup`
+
+```sh
+gitid setup
+```
+
+`setup` detects your shell from `$SHELL` (PowerShell is assumed on Windows),
+shows the exact line it wants to add to your rc file, and asks before writing
+anything. It is idempotent — the installed block is fenced with
+`# >>> gitid hook >>>` markers, and re-running reports "already installed".
+
+Useful variants:
+
+```sh
+gitid setup zsh           # skip detection, target a specific shell
+gitid setup --print       # only print the line + target file; change nothing
+gitid setup --yes         # append without prompting (for scripts; -y)
+```
+
+For nushell, which cannot `eval` a string, `setup` instead writes the whole
+hook script to a standalone autoload file.
+
+After installing, restart your shell (or source the rc file).
+
+## Manual install
+
+Add one line to your shell's rc file:
+
+<Tabs syncKey="shell">
+  <TabItem label="Bash">
+    Add to `~/.bashrc`:
+
+    ```sh
+    eval "$(gitid hook bash)"
+    ```
+
+    The hook registers itself in `PROMPT_COMMAND` and re-resolves only when
+    `$PWD` changes.
+  </TabItem>
+  <TabItem label="Zsh">
+    Add to `~/.zshrc`:
+
+    ```sh
+    eval "$(gitid hook zsh)"
+    ```
+
+    The hook registers a `chpwd` hook via `add-zsh-hook`.
+  </TabItem>
+  <TabItem label="Fish">
+    Add to `~/.config/fish/config.fish`:
+
+    ```sh
+    gitid hook fish | source
+    ```
+
+    The hook is a function triggered `--on-variable PWD`.
+  </TabItem>
+  <TabItem label="PowerShell">
+    Add to your `$PROFILE`:
+
+    ```powershell
+    Invoke-Expression (& gitid hook powershell | Out-String)
+    ```
+
+    The hook wraps your `prompt` function and re-resolves when `$PWD` changes.
+  </TabItem>
+  <TabItem label="Nushell">
+    Nushell can't eval generated code at startup, so save the hook script into
+    your vendor autoload directory once (and re-run after gitid updates):
+
+    ```sh
+    gitid hook nu | save -f ($nu.data-dir | path join vendor/autoload/gitid.nu)
+    ```
+
+    The hook registers an `env_change.PWD` hook that parses `gitid env
+    --shell nu` (JSON) and applies the sets/unsets.
+  </TabItem>
+</Tabs>
+
+`gitid hook <shell>` just prints the script, so you can read exactly what will
+run in your shell before installing it. Accepted shell names: `bash`, `zsh`,
+`fish`, `powershell` (alias `pwsh`), `nu` (alias `nushell`).
+
+## Shell completions
+
+`gitid completions <shell>` prints a completion script for the same five
+shells:
+
+<Tabs syncKey="shell">
+  <TabItem label="Bash">
+    ```sh
+    # system-wide completions dir, or:
+    mkdir -p ~/.local/share/bash-completion/completions
+    gitid completions bash > ~/.local/share/bash-completion/completions/gitid
+    ```
+  </TabItem>
+  <TabItem label="Zsh">
+    Save as `_gitid` somewhere on your `$fpath`, e.g.:
+
+    ```sh
+    mkdir -p ~/.zsh/completions
+    gitid completions zsh > ~/.zsh/completions/_gitid
+    # in ~/.zshrc, before compinit:
+    # fpath=(~/.zsh/completions $fpath)
+    ```
+  </TabItem>
+  <TabItem label="Fish">
+    ```sh
+    gitid completions fish > ~/.config/fish/completions/gitid.fish
+    ```
+  </TabItem>
+  <TabItem label="PowerShell">
+    Add to your `$PROFILE`:
+
+    ```powershell
+    gitid completions powershell | Out-String | Invoke-Expression
+    ```
+  </TabItem>
+  <TabItem label="Nushell">
+    ```sh
+    gitid completions nu | save -f ($nu.data-dir | path join vendor/autoload/gitid-completions.nu)
+    ```
+  </TabItem>
+</Tabs>
+
+## Prompt integration
+
+The hook exports `GITID_PROFILE` whenever a profile is active. Two examples:
+
+**starship** (`~/.config/starship.toml`):
+
+```toml
+[env_var.GITID_PROFILE]
+format = "[$env_value]($style) "
+style = "bold yellow"
+```
+
+**powerlevel10k** (`~/.zshrc`):
+
+```sh
+function prompt_gitid() { [[ -n $GITID_PROFILE ]] && p10k segment -f yellow -t $GITID_PROFILE }
+# add 'gitid' to POWERLEVEL9K_LEFT_PROMPT_ELEMENTS
+```
+
+## Verifying the hook
+
+```sh
+cd ~/code/work/some-repo
+echo $GITID_PROFILE        # -> work
+gh auth status             # uses the profile's isolated GH_CONFIG_DIR
+```
+
+If `GITID_PROFILE` is empty but `gitid current` reports a profile, the hook
+isn't installed in this shell — run `gitid setup` (or `gitid doctor`, which
+checks the hook among other things).

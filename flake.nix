@@ -89,6 +89,7 @@
                     nixd
                     nixfmt
                     go-task
+                    nodejs_24
                   ]
                   ++ config.pre-commit.settings.enabledPackages;
 
@@ -119,6 +120,13 @@
               shellHook = ''
                 ${config.pre-commit.shellHook}
               '';
+            };
+
+            docs = pkgs.mkShell {
+              packages = with pkgs; [
+                go-task
+                nodejs_24
+              ];
             };
           };
         };

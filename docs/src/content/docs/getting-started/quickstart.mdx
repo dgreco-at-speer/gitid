@@ -1,0 +1,95 @@
+---
+title: Quickstart
+description: Create two profiles, map them to directory trees, and verify git resolves the right identity — in about two minutes.
+---
+
+import { Steps, Aside } from "@astrojs/starlight/components";
+
+This walks you through the whole loop: two profiles, two directory trees, verification. You need gitid [installed](../installation/) and git ≥ 2.13.
+
+<Steps>
+
+1. **Create two profiles.**
+
+   Run `gitid add` with no flags for an interactive wizard — it discovers SSH
+   keys, walks you through signing setup, and can run `gh auth login` for you:
+
+   ```sh
+   gitid add
+   ```
+
+   Or pass everything as flags (add `--non-interactive` in scripts so it fails
+   instead of prompting for anything missing):
+
+   ```sh
+   gitid add work --git-name "Jane Doe" --email jane@corp.example \
+       --ssh-key ~/.ssh/id_work \
+       --signing ssh --signing-key ~/.ssh/id_work.pub --sign-commits
+
+   gitid add personal --git-name "Jane" --email jane@home.example \
+       --ssh-key ~/.ssh/id_personal
+   ```
+
+   Every part except `--git-name` and `--email` is optional: skip `--ssh-key`
+   if you use one key everywhere, skip the `--signing*` flags if you don't
+   sign, and pass `--no-gh` if you don't want an isolated GitHub CLI auth
+   directory for the profile.
+
+2. **Assign directory trees.**
+
+   `gitid use <profile> [dir]` works from anywhere — no need to `cd` into the
+   directory, and no repo there is touched:
+
+   ```sh
+   gitid use work ~/code/work
+   gitid use personal ~/code/oss
+   ```
+
+   Mappings apply to the whole tree, including repos you clone later. They can
+   nest — the longest matching path wins:
+
+   ```sh
+   gitid use personal ~/code          # broad default
+   gitid use work ~/code/work         # overrides inside ~/code/work
+   ```
+
+3. **Verify.**
+
+   ```sh
+   gitid current ~/code/work
+   ```
+
+   ```console
+   $ cd ~/code/work/some-repo && git config user.email
+   jane@corp.example
+   ```
+
+   `gitid current` shows gitid's view and, inside a repo, cross-checks what
+   git actually resolves — it warns if a local `.git/config` override wins.
+   `gitid list` marks the profile active for your current directory with `●`,
+   and `gitid doctor` diagnoses anything that looks wrong.
+
+4. **Install the shell hook (optional).**
+
+   ```sh
+   gitid setup      # detects your shell and asks before editing your rc file
+   ```
+
+   Identity switching already works without this. The hook is only needed for
+   per-profile GitHub CLI auth (`GH_CONFIG_DIR`) and the `GITID_PROFILE`
+   prompt variable. Use `gitid setup --print` to see the line it would add
+   without modifying anything.
+
+5. **Where next?**
+
+   - [How it works](../how-it-works/) — the mechanism and file layout
+   - [Profiles](../../guides/profiles/) — the full `profiles.toml` schema, signing, `gh`, extra env vars
+   - [Shell integration](../../guides/shell-integration/) — per-shell hook setup and prompt integration
+
+</Steps>
+
+<Aside type="tip">
+  Commits still showing the wrong identity? A `user.email` in a repo's own
+  `.git/config` beats any include. Run `gitid doctor` in that repo — it
+  detects local overrides and every other common misconfiguration.
+</Aside>

@@ -3,6 +3,8 @@ extends: default
 ignore:
   - .venv/
   - .pre-commit-config.yaml
+  - docs/node_modules/
+  - docs/dist/
 rules:
   truthy:
     check-keys: false

@@ -1,0 +1,51 @@
+---
+title: gitid
+description: Switch git identities — name/email, SSH key, commit signing, and GitHub CLI auth — automatically, per directory tree.
+template: splash
+hero:
+  tagline: Per-directory git identities — name, email, SSH key, signing, and gh auth switch the moment you cd.
+  actions:
+    - text: Quickstart
+      link: getting-started/quickstart/
+      icon: right-arrow
+    - text: Installation
+      link: getting-started/installation/
+      icon: download
+      variant: minimal
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+Assign a profile to a directory tree once. Then:
+
+```console
+$ cd ~/code/work/anything && git config user.email
+jane@corp.example
+$ cd ~/code/oss/anything && git config user.email
+jane@home.example
+```
+
+No per-repo setup, no `cd`-ing around to configure things, no editing any repository's local config.
+
+<CardGrid>
+  <Card title="Never edits your repos" icon="approve-check">
+    gitid touches your global gitconfig exactly once — a single appended
+    `[include]` line. Every repository's `.git/config` is left alone, and every
+    other file gitid uses is generated and fully owned by gitid.
+  </Card>
+  <Card title="Per directory tree" icon="open-book">
+    Built on git conditional includes (`includeIf "gitdir:…"`). Map
+    `~/code/work` to a profile and every repo under it — present or future —
+    resolves the right identity. Nested mappings work; the longest path wins.
+  </Card>
+  <Card title="The whole identity switches" icon="setting">
+    Not just `user.name` and `user.email`: the SSH key
+    (`core.sshCommand`), commit/tag signing keys, and an isolated GitHub CLI
+    (`gh`) auth directory all follow the profile.
+  </Card>
+  <Card title="Works in your shell" icon="laptop">
+    Hooks for bash, zsh, fish, PowerShell, and nushell handle the parts git
+    config can't — `GH_CONFIG_DIR` isolation and a `GITID_PROFILE` variable for
+    your prompt. Identity itself works with no shell integration at all.
+  </Card>
+</CardGrid>

@@ -1,0 +1,99 @@
+---
+title: Installation
+description: Install gitid with the one-line installer on Linux, macOS, or Windows, or build it from source with cargo.
+---
+
+import { Tabs, TabItem, Aside } from "@astrojs/starlight/components";
+
+<Tabs>
+  <TabItem label="Linux / macOS">
+
+    ```sh
+    curl -fsSL https://raw.githubusercontent.com/dgreco-at-speer/gitid/main/scripts/install.sh | sh
+    ```
+
+    The script detects your OS and architecture (x86_64 or aarch64) and:
+
+    - **Linux:** downloads the matching release binary into `~/.local/bin`,
+      preferring the statically linked musl build (runs on any libc) with a
+      glibc fallback. It warns if the install directory isn't on your `PATH`.
+    - **macOS:** there is no prebuilt darwin binary yet, so the script builds
+      from source with `cargo install --git` (install Rust from
+      [rustup.rs](https://rustup.rs) first).
+
+    Downloads go through `gh` when the GitHub CLI is installed; otherwise the
+    script falls back to `curl` (using `GH_TOKEN`/`GITHUB_TOKEN` if set).
+
+  </TabItem>
+  <TabItem label="Windows">
+
+    In PowerShell (5+):
+
+    ```powershell
+    irm https://raw.githubusercontent.com/dgreco-at-speer/gitid/main/scripts/install.ps1 | iex
+    ```
+
+    The script downloads the `x86_64-pc-windows-gnu` release, installs
+    `gitid.exe` into `%LOCALAPPDATA%\gitid\bin`, and adds that directory to
+    your user `PATH` if it isn't already there (restart your shell to pick it
+    up). Like the Unix installer, it uses `gh` when available and falls back
+    to a direct download with `GH_TOKEN`/`GITHUB_TOKEN`.
+
+  </TabItem>
+  <TabItem label="From source">
+
+    Requires Rust 1.85+. Useful for macOS or any target without a prebuilt
+    binary:
+
+    ```sh
+    cargo install --git https://github.com/dgreco-at-speer/gitid gitid
+    ```
+
+    Or from a checkout:
+
+    ```sh
+    cargo install --path .
+    ```
+
+  </TabItem>
+</Tabs>
+
+<Aside type="note" title="Private repo?">
+  Install the [GitHub CLI](https://cli.github.com) and run `gh auth login`
+  first — both installers use it automatically to download release assets.
+  Without `gh`, set `GH_TOKEN` (or `GITHUB_TOKEN`) to a token with read access
+  before running the installer.
+</Aside>
+
+## Installer environment variables
+
+Both installer scripts honor the same knobs:
+
+| Variable | Meaning | Default |
+|---|---|---|
+| `GITID_REPO` | `owner/repo` to install from | `dgreco-at-speer/gitid` |
+| `GITID_VERSION` | Release tag to install | latest release |
+| `GITID_INSTALL_DIR` | Where to put the binary | `~/.local/bin` (Windows: `%LOCALAPPDATA%\gitid\bin`) |
+| `GH_TOKEN` / `GITHUB_TOKEN` | Token for private-repo downloads when `gh` is absent | — |
+
+For example, to pin a version and install system-wide:
+
+```sh
+GITID_VERSION=v0.3.0 GITID_INSTALL_DIR=/usr/local/bin \
+  sh -c "$(curl -fsSL https://raw.githubusercontent.com/dgreco-at-speer/gitid/main/scripts/install.sh)"
+```
+
+## Verify and set up
+
+Check the install, then bootstrap and install the shell hook:
+
+```sh
+gitid --version
+gitid setup     # detects your shell and offers to add the hook line
+```
+
+`gitid setup` creates the config on first run (`gitid init` does the same explicitly). The hook is only needed for GitHub CLI auth isolation and the prompt variable — identity switching works without it. See [Shell integration](../../guides/shell-integration/) for per-shell details.
+
+## Staying up to date
+
+`gitid update` replaces the running binary with the latest release; `gitid update --check` only reports whether a newer version exists. gitid also checks opportunistically (at most once a day, in the background) and prints a one-line notice to stderr when an update is available — it never installs anything on its own. Disable the background check with `GITID_NO_UPDATE_CHECK=1`.

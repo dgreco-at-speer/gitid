@@ -1,0 +1,49 @@
+---
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+tasks:
+  default:
+    desc: List tasks
+    silent: true
+    cmds:
+      - task -t tasks/docs.yml --list
+
+  install:
+    desc: Install docs site dependencies
+    silent: true
+    dir: docs
+    cmds:
+      - npm ci
+
+  dev:
+    desc: Run the docs dev server
+    silent: true
+    dir: docs
+    deps:
+      - install
+    cmds:
+      - npm run dev
+
+  build:
+    desc: Build the docs site
+    silent: true
+    dir: docs
+    deps:
+      - install
+    cmds:
+      - npm run build
+
+  preview:
+    desc: Preview the built docs site
+    silent: true
+    dir: docs
+    cmds:
+      - npm run preview
+
+  clean:
+    desc: Remove docs build artifacts
+    silent: true
+    dir: docs
+    cmds:
+      - rm -rf dist .astro

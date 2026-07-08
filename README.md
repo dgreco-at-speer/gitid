@@ -12,6 +12,9 @@ $ cd ~/code/work/anything && git config user.email
 jane@corp.example
 ```
 
+> Full documentation lives in [`docs/`](docs/) — run `task docs:dev` to preview
+> it locally.
+
 ## How it works
 
 gitid never edits your repositories. Instead it leans on two mechanisms:

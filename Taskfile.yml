@@ -6,6 +6,7 @@ includes:
   yaml: ./tasks/yaml.yml
   toml: ./tasks/toml.yml
   rust: ./tasks/rust.yml
+  docs: ./tasks/docs.yml
 
 tasks:
   default:
@@ -19,6 +20,7 @@ tasks:
     silent: true
     deps:
       - rust:clean
+      - docs:clean
     cmds: []
 
   build:
