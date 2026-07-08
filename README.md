@@ -206,6 +206,29 @@ function prompt_gitid() { [[ -n $GITID_PROFILE ]] && p10k segment -f yellow -t $
 | `gitid hook <shell>` | Print the shell hook script |
 | `gitid setup [shell]` | Install the hook into your rc file |
 | `gitid completions <shell>` | Print shell completions |
+| `gitid update` | Update gitid to the latest release |
+| `gitid update --check` | Check for a newer release without installing |
+
+## Updating
+
+`gitid update` downloads the latest release and replaces the running binary in
+place (it swaps whichever `gitid` is executing, wherever it lives). `gitid update
+--check` only reports whether a newer version exists.
+
+gitid also checks for updates opportunistically: at most once a day, in the
+background, during normal commands. When a newer version is known it prints a
+one-line notice to stderr (never to stdout, so pipelines are unaffected) — it
+never installs anything on its own. The background check only runs in interactive
+sessions, and shell-eval commands (`env`, `hook`, `completions`) stay silent.
+
+Because releases live in a private repo, updating needs auth the same way the
+installer does: install the [GitHub CLI](https://cli.github.com) and run `gh auth
+login`, or set `GH_TOKEN`. macOS has no prebuilt binary yet, so `update` there
+points you at `cargo install` until darwin releases exist.
+
+Knobs (environment variables): `GITID_REPO`, `GITID_VERSION` (pin a specific tag),
+`GITID_NO_UPDATE_CHECK` (disable the background check entirely), and
+`GITID_UPDATE_INTERVAL` (override the check interval, in seconds).
 
 ## For AI agents
 

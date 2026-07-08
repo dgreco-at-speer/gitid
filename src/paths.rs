@@ -103,6 +103,12 @@ impl GitidPaths {
     pub fn gh_dir(&self, profile: &str) -> PathBuf {
         self.data_dir.join("gh").join(profile)
     }
+
+    /// Machine-owned cache for the opportunistic update check (last-checked
+    /// timestamp + newest version seen).
+    pub fn update_state_json(&self) -> PathBuf {
+        self.data_dir.join("update-check.json")
+    }
 }
 
 /// Expand a leading `~` or `~/` in user-supplied input to an absolute path.

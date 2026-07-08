@@ -62,6 +62,8 @@ pub enum Command {
     Completions(CompletionsArgs),
     /// Create config dirs and bootstrap the global include.
     Init,
+    /// Update gitid to the latest release.
+    Update(UpdateArgs),
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -248,4 +250,20 @@ pub struct SetupArgs {
 pub struct CompletionsArgs {
     #[arg(value_enum)]
     pub shell: Shell,
+}
+
+#[derive(Debug, Args)]
+pub struct UpdateArgs {
+    /// Only check whether a newer version exists; do not install.
+    #[arg(long)]
+    pub check: bool,
+    /// Reinstall even if already up to date.
+    #[arg(long, short)]
+    pub force: bool,
+    /// Install a specific release tag instead of the latest (default: $GITID_VERSION).
+    #[arg(long)]
+    pub version: Option<String>,
+    /// Internal: refresh the update-check cache and exit silently.
+    #[arg(long, hide = true)]
+    pub refresh_cache: bool,
 }

@@ -50,7 +50,10 @@ if [ "$os" = "Darwin" ]; then
 fi
 
 [ "$os" = "Linux" ] || err "unsupported OS: $os — on Windows use scripts/install.ps1"
-target="${arch}-unknown-linux-gnu"
+# Prefer the statically-linked musl build (runs on any libc), falling back to
+# the glibc build for older releases that only shipped gnu.
+target="${arch}-unknown-linux-musl"
+fallback="${arch}-unknown-linux-gnu"
 ext="tar.gz"
 
 tmp="$(mktemp -d)"
@@ -63,7 +66,15 @@ if have gh; then
   gh release download ${VERSION:+"$VERSION"} \
     --repo "$REPO" \
     --pattern "gitid-*-${target}.${ext}" \
-    --dir "$tmp"
+    --dir "$tmp" 2>/dev/null \
+    || {
+      say "No $target asset; trying $fallback…"
+      # shellcheck disable=SC2086
+      gh release download ${VERSION:+"$VERSION"} \
+        --repo "$REPO" \
+        --pattern "gitid-*-${fallback}.${ext}" \
+        --dir "$tmp"
+    }
 else
   have curl || err "need either gh or curl installed"
   if [ -z "$VERSION" ]; then
@@ -77,8 +88,13 @@ else
   asset="gitid-${VERSION}-${target}.${ext}"
   url="https://github.com/$REPO/releases/download/$VERSION/$asset"
   say "Downloading $asset…"
-  curl -fSL ${TOKEN:+-H "Authorization: Bearer $TOKEN"} "$url" -o "$tmp/$asset" \
-    || err "download failed (private repo? install gh and run 'gh auth login')"
+  if ! curl -fSL ${TOKEN:+-H "Authorization: Bearer $TOKEN"} "$url" -o "$tmp/$asset" 2>/dev/null; then
+    asset="gitid-${VERSION}-${fallback}.${ext}"
+    url="https://github.com/$REPO/releases/download/$VERSION/$asset"
+    say "No $target asset; downloading $asset…"
+    curl -fSL ${TOKEN:+-H "Authorization: Bearer $TOKEN"} "$url" -o "$tmp/$asset" \
+      || err "download failed (private repo? install gh and run 'gh auth login')"
+  fi
 fi
 
 # --- install -----------------------------------------------------------------

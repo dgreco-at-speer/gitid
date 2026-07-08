@@ -39,25 +39,51 @@ impl Ctx {
 /// Run the parsed CLI, returning a process exit code.
 pub fn run(cli: Cli) -> Result<ExitCode> {
     let ctx = Ctx::new()?;
-    match cli.command {
-        Command::List(args) => list::run(&ctx, &args)?,
-        Command::Add(args) => add::run(&ctx, &args)?,
-        Command::Show(args) => show::run(&ctx, &args)?,
-        Command::Edit(args) => edit::run(&ctx, &args)?,
-        Command::Remove(args) => remove::run(&ctx, &args)?,
-        Command::Use(args) => use_dir::run(&ctx, &args)?,
-        Command::Forget(args) => use_dir::forget(&ctx, &args)?,
-        Command::Dirs(args) => dirs::run(&ctx, &args)?,
-        Command::Current(args) => return current::run(&ctx, &args),
-        Command::Doctor(args) => return doctor::run(&ctx, &args),
-        Command::Sync => sync::run(&ctx)?,
-        Command::Env(args) => env::run(&ctx, &args)?,
+    let notify = should_notify(&cli.command);
+    let code = dispatch(&ctx, cli.command)?;
+    // Best-effort, notify-only update check after a user-facing command succeeds.
+    if notify {
+        crate::update::maybe_notify(&ctx);
+    }
+    Ok(code)
+}
+
+/// Dispatch a single command to its handler.
+fn dispatch(ctx: &Ctx, command: Command) -> Result<ExitCode> {
+    match command {
+        Command::List(args) => list::run(ctx, &args)?,
+        Command::Add(args) => add::run(ctx, &args)?,
+        Command::Show(args) => show::run(ctx, &args)?,
+        Command::Edit(args) => edit::run(ctx, &args)?,
+        Command::Remove(args) => remove::run(ctx, &args)?,
+        Command::Use(args) => use_dir::run(ctx, &args)?,
+        Command::Forget(args) => use_dir::forget(ctx, &args)?,
+        Command::Dirs(args) => dirs::run(ctx, &args)?,
+        Command::Current(args) => return current::run(ctx, &args),
+        Command::Doctor(args) => return doctor::run(ctx, &args),
+        Command::Sync => sync::run(ctx)?,
+        Command::Env(args) => env::run(ctx, &args)?,
         Command::Hook(args) => hook::run(&args)?,
-        Command::Setup(args) => setup::run(&ctx, &args)?,
+        Command::Setup(args) => setup::run(ctx, &args)?,
         Command::Completions(args) => completions::run(&args)?,
-        Command::Init => sync::init(&ctx)?,
+        Command::Init => sync::init(ctx)?,
+        Command::Update(args) => return crate::update::run(ctx, &args),
     }
     Ok(ExitCode::SUCCESS)
+}
+
+/// Whether to run the opportunistic update check after this command. Excludes
+/// machine-facing / shell-eval'd commands (they must stay fast and emit no extra
+/// bytes) and `update` itself (avoids recursion with the hidden refresh worker).
+fn should_notify(command: &Command) -> bool {
+    !matches!(
+        command,
+        Command::Env(_)
+            | Command::Hook(_)
+            | Command::Completions(_)
+            | Command::Current(_)
+            | Command::Update(_)
+    )
 }
 
 /// Resolve a directory argument to an absolute path. A leading `~` is expanded;

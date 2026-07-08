@@ -80,6 +80,15 @@ pub fn info(msg: &str) {
     );
 }
 
+/// Like [`info`], but on stderr — for ambient notices (e.g. "update available")
+/// that must never pollute stdout consumed by pipelines.
+pub fn note(msg: &str) {
+    eprintln!(
+        "{} {msg}",
+        "›".if_supports_color(Stderr, |t| t.blue().to_string())
+    );
+}
+
 pub fn warn(msg: &str) {
     eprintln!(
         "{} {msg}",

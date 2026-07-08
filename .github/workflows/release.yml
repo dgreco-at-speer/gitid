@@ -22,8 +22,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --generate-notes --verify-tag
 
-  # All builds run on the free 1x ubuntu runner and cross-compile, so private
-  # repos never spend on the 2x (Windows) or 10x (macOS) runner multipliers.
+  # All builds run on the free 1x ubuntu runner and cross-compile (via
+  # actions-rust-cross, which uses `cross`/Docker as needed), so private repos
+  # never spend on the 2x (Windows) or 10x (macOS) runner multipliers. macOS is
+  # intentionally omitted: it can't be cross-compiled from Linux, so the
+  # installer builds it from source instead.
   build:
     name: Build ${{ matrix.target }}
     needs: create-release
@@ -34,25 +37,21 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
           - target: aarch64-unknown-linux-gnu
-            apt: gcc-aarch64-linux-gnu
+          - target: x86_64-unknown-linux-musl
+          - target: aarch64-unknown-linux-musl
           - target: x86_64-pc-windows-gnu
-            apt: gcc-mingw-w64-x86-64
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Install cross toolchain
-        run: |
-          if [ -n "${{ matrix.apt }}" ]; then
-            sudo apt-get update
-            sudo apt-get install -y "${{ matrix.apt }}"
-          fi
-          rustup target add "${{ matrix.target }}"
-
-      - name: Build
-        env:
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-        run: cargo build --release --locked --target "${{ matrix.target }}"
+      - name: Build ${{ matrix.target }}
+        uses: houseabsolute/actions-rust-cross@21b0f18dc621b25bfae556ff2791fca4173121e8 # v1.0.8
+        with:
+          command: build
+          target: ${{ matrix.target }}
+          toolchain: stable
+          args: "--release --locked"
+          strip: true
 
       - name: Package
         run: |
