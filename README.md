@@ -196,7 +196,8 @@ function prompt_gitid() { [[ -n $GITID_PROFILE ]] && p10k segment -f yellow -t $
 
 | Command | Purpose |
 |---------|---------|
-| `gitid add [name]` | Create a profile (wizard or flags) |
+| `gitid add [name]` | Create a profile from existing credentials (wizard or flags) |
+| `gitid new [name]` | Provision a profile from scratch (generate SSH/GPG keys) |
 | `gitid list` | List profiles (`●` = active for cwd) |
 | `gitid show <name>` | Show a profile's details |
 | `gitid edit <name>` | Change a profile's fields |

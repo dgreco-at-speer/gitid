@@ -109,6 +109,7 @@
                 [
                   go-task
                   git
+                  openssh
                   zsh
                   fish
                   nushell

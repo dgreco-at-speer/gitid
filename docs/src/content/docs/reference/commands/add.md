@@ -14,10 +14,6 @@ Create a new profile — a named git identity (user.name/user.email, optional SS
 gitid add [OPTIONS] [NAME]
 ```
 
-## Aliases
-
-`gitid new`
-
 ## Options
 
 | Flag | Description |
@@ -76,6 +72,7 @@ $ gitid add oss --non-interactive --git-name "Jane" --email jane@home.example --
 
 ## See also
 
+- [`gitid new`](../new/) — provision a profile from scratch, generating keys for you
 - [`gitid use`](../use/) — assign the new profile to a directory tree
 - [`gitid edit`](../edit/) — change a profile's fields later
 - [profiles.toml reference](../../profiles-toml/) — the file this command writes

@@ -11,6 +11,7 @@ pub mod gitconfig;
 pub mod mcp;
 pub mod output;
 pub mod paths;
+pub mod provision;
 pub mod shell;
 pub mod ssh;
 pub mod store;

@@ -9,6 +9,7 @@ mod edit;
 mod env;
 mod hook;
 mod list;
+pub(crate) mod new;
 mod remove;
 mod setup;
 mod show;
@@ -53,6 +54,7 @@ fn dispatch(ctx: &Ctx, command: Command) -> Result<ExitCode> {
     match command {
         Command::List(args) => list::run(ctx, &args)?,
         Command::Add(args) => add::run(ctx, &args)?,
+        Command::New(args) => new::run(ctx, &args)?,
         Command::Show(args) => show::run(ctx, &args)?,
         Command::Edit(args) => edit::run(ctx, &args)?,
         Command::Remove(args) => remove::run(ctx, &args)?,
