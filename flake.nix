@@ -128,6 +128,18 @@
                 nodejs_24
               ];
             };
+
+            demo = pkgs.mkShell {
+              packages = with pkgs; [
+                go-task
+                git
+                vhs
+                openssh
+                bashInteractive
+              ];
+              buildInputs = with pkgs; [ rust.package ];
+              nativeBuildInputs = with pkgs; [ openssl ];
+            };
           };
         };
     };

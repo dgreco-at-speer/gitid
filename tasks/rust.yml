@@ -23,6 +23,13 @@ tasks:
     cmds:
       - cargo build
 
+  build-release:
+    desc: Build the project in release mode
+    silent: true
+    deps: []
+    cmds:
+      - cargo build --release
+
   test:
     desc: Test the project
     silent: true

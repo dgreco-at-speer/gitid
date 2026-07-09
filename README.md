@@ -5,6 +5,8 @@ CLI auth — automatically, per directory tree. Assign a profile to a directory
 **from anywhere**, without `cd`-ing there and without touching any repo's local
 config.
 
+![gitid demo — add two identities, map them to directory trees, and the right one applies automatically as you move between repos](demo/gitid.gif)
+
 ```console
 $ gitid add work --git-name "Jane Doe" --email jane@corp.example --ssh-key ~/.ssh/id_work
 $ gitid use work ~/code/work

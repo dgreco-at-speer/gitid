@@ -1,0 +1,24 @@
+---
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+tasks:
+  default:
+    desc: List tasks
+    silent: true
+    cmds:
+      - task -t tasks/demo.yml --list
+
+  render:
+    desc: Render the demo recording (GIF + MP4 + WebM) with VHS
+    silent: true
+    deps:
+      - :rust:build-release
+    cmds:
+      - vhs demo/gitid.tape
+
+  clean:
+    desc: Remove generated demo assets
+    silent: true
+    cmds:
+      - rm -f demo/gitid.gif docs/public/gitid.mp4 docs/public/gitid.webm
