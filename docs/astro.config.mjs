@@ -13,6 +13,11 @@ export default defineConfig({
       title: "gitid",
       description:
         "Switch between git identities — name/email, SSH key, commit signing, GitHub CLI auth — automatically, per directory tree.",
+      components: {
+        // Override the splash hero to render the animated bian lian octocat
+        // mascot when a page declares no `hero.image`.
+        Hero: "./src/components/Hero.astro",
+      },
       social: [
         {
           icon: "github",
