@@ -34,9 +34,9 @@ Explicit first-time bootstrap:
 
 ```console
 $ gitid init
-✔ initialised gitid (config: /home/jane/.config/gitid, data: /home/jane/.local/share/gitid)
-✔ added gitid include to your global gitconfig
-ℹ run `gitid setup` to install the shell hook
+✓ initialised gitid (config: /home/jane/.config/gitid, data: /home/jane/.local/share/gitid)
+✓ added gitid include to your global gitconfig
+› run `gitid setup` to install the shell hook
 ```
 
 In a provisioning script, followed by the hook install:

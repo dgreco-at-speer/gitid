@@ -79,7 +79,7 @@ Both installer scripts honor the same knobs:
 For example, to pin a version and install system-wide:
 
 ```sh
-GITID_VERSION=v0.3.0 GITID_INSTALL_DIR=/usr/local/bin \
+GITID_VERSION=v%GITID_VERSION% GITID_INSTALL_DIR=/usr/local/bin \
   sh -c "$(curl -fsSL https://raw.githubusercontent.com/dgreco-at-speer/gitid/main/scripts/install.sh)"
 ```
 

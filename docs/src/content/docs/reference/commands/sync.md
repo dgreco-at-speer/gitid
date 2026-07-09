@@ -41,7 +41,7 @@ After editing a profile's email by hand:
 ```console
 $ vi ~/.config/gitid/profiles.toml
 $ gitid sync
-✔ synced: 1 fragment(s) written, include regenerated
+✓ synced: 1 fragment(s) written, include regenerated
 ```
 
 When everything is already up to date, sync says nothing and exits 0:

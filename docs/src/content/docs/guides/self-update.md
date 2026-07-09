@@ -11,7 +11,7 @@ gitid can update itself from GitHub releases and quietly tells you when a newer 
 gitid update            # install the latest release
 gitid update --check    # only report whether a newer version exists
 gitid update --force    # reinstall even if already up to date
-gitid update --version v0.3.0   # install a specific release tag
+gitid update --version v%GITID_VERSION%   # install a specific release tag
 ```
 
 `gitid update` downloads the release archive for your platform and replaces the running binary **in place** — it swaps whichever `gitid` is currently executing, wherever it lives, so it works regardless of where the installer (or you) put it.

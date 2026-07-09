@@ -3,6 +3,10 @@
 # yamllint disable rule:line-length
 # yamllint disable rule:comments
 name: Release
+# The GitHub release and its tag are created by release-please (see
+# release-please.yml). Because release-please authenticates with a PAT, the tag
+# it pushes triggers this workflow, which then builds and attaches the binaries
+# to the release release-please already created.
 on:
   push:
     tags:
@@ -10,18 +14,6 @@ on:
 permissions:
   contents: write
 jobs:
-  create-release:
-    name: Create release
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Create GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --generate-notes --verify-tag
-
   # All builds run on the free 1x ubuntu runner and cross-compile (via
   # actions-rust-cross, which uses `cross`/Docker as needed), so private repos
   # never spend on the 2x (Windows) or 10x (macOS) runner multipliers. macOS is
@@ -29,7 +21,6 @@ jobs:
   # installer builds it from source instead.
   build:
     name: Build ${{ matrix.target }}
-    needs: create-release
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

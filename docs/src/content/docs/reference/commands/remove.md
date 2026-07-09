@@ -48,7 +48,7 @@ Force-remove the profile together with its mappings:
 ```console
 $ gitid remove work --force
 ✓ removed profile "work"
-ℹ left gh auth dir in place: /home/jane/.local/share/gitid/gh/work (delete manually if no longer needed)
+› left gh auth dir in place: /home/jane/.local/share/gitid/gh/work (delete manually if no longer needed)
 ```
 
 ## Notes

@@ -1,7 +1,39 @@
 // @ts-check
+import { readFileSync } from "node:fs";
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import starlightLlmsTxt from "starlight-llms-txt";
+
+// The crate version is the single source of truth for the version shown in the
+// docs. Read it from Cargo.toml at build time and substitute the literal token
+// `%GITID_VERSION%` wherever it appears in content, so no version number is
+// hand-maintained here. The `^version = "…"` anchor matches the [package]
+// version, not the un-anchored `version =` entries under [dependencies].
+const gitidVersion = readFileSync(
+  new URL("../Cargo.toml", import.meta.url),
+  "utf8",
+).match(/^version = "(.+?)"/m)?.[1];
+if (!gitidVersion) throw new Error("could not read version from ../Cargo.toml");
+
+// Tiny remark plugin: replace `%GITID_VERSION%` with the crate version in text
+// and code nodes. Works uniformly for .md and .mdx (the `%…%` token is never
+// parsed as an MDX `{expr}`), so no per-file conversion is needed.
+function remarkGitidVersion() {
+  return (tree) => {
+    const visit = (node) => {
+      if (
+        (node.type === "text" ||
+          node.type === "code" ||
+          node.type === "inlineCode") &&
+        typeof node.value === "string"
+      ) {
+        node.value = node.value.replaceAll("%GITID_VERSION%", gitidVersion);
+      }
+      if (Array.isArray(node.children)) node.children.forEach(visit);
+    };
+    visit(tree);
+  };
+}
 
 // The deployment target is not decided yet. When a host is chosen, set
 // DOCS_SITE / DOCS_BASE in the deploy environment, e.g.
@@ -9,6 +41,7 @@ import starlightLlmsTxt from "starlight-llms-txt";
 export default defineConfig({
   site: process.env.DOCS_SITE,
   base: process.env.DOCS_BASE,
+  markdown: { remarkPlugins: [remarkGitidVersion] },
   integrations: [
     starlight({
       title: "gitid",

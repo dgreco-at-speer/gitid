@@ -62,7 +62,7 @@ See what would be written for OpenCode without touching anything:
 
 ```console
 $ gitid mcp install opencode --print
-ℹ OpenCode → /home/jane/.config/opencode/opencode.json
+› OpenCode → /home/jane/.config/opencode/opencode.json
 {
   "mcp": {
     "gitid": {

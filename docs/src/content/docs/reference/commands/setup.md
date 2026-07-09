@@ -44,11 +44,11 @@ Interactive install with shell auto-detection:
 
 ```console
 $ gitid setup
-ℹ will append the gitid hook to /home/jane/.zshrc:
+› will append the gitid hook to /home/jane/.zshrc:
     eval "$(gitid hook zsh)"
 ? Append to /home/jane/.zshrc? (y/N) y
-✔ installed gitid hook in /home/jane/.zshrc
-ℹ restart your shell (or source the rc file) to activate
+✓ installed gitid hook in /home/jane/.zshrc
+› restart your shell (or source the rc file) to activate
 ```
 
 Just show what would be added, without touching anything:

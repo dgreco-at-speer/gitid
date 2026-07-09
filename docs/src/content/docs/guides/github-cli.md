@@ -93,7 +93,7 @@ Outside any mapped tree, `GH_CONFIG_DIR` is restored to its prior value, so your
 
 ```console
 $ gitid remove work --force
-✔ removed profile "work"
+✓ removed profile "work"
 left gh auth dir in place: /home/jane/.local/share/gitid/gh/work (delete manually if no longer needed)
 ```
 

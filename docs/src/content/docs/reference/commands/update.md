@@ -45,14 +45,14 @@ Check without installing:
 
 ```console
 $ gitid update --check
-ℹ gitid 0.4.0 is available (you have 0.3.0). Run `gitid update`.
+› gitid 0.4.0 is available (you have %GITID_VERSION%). Run `gitid update`.
 ```
 
 Install the latest release:
 
 ```console
 $ gitid update
-✔ updated gitid to 0.4.0
+✓ updated gitid to 0.4.0
 ```
 
 Pin a specific tag (e.g. to roll back):

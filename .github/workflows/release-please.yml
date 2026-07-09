@@ -1,0 +1,48 @@
+---
+# yaml-language-server: $schema=https://www.schemastore.org/github-workflow.json
+# yamllint disable rule:line-length
+# yamllint disable rule:comments
+name: release-please
+on:
+  push:
+    branches:
+      - dev
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  release-please:
+    name: Release please
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run release-please
+        id: release
+        uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
+        with:
+          # A PAT (not the default GITHUB_TOKEN) so the tag + GitHub release
+          # release-please creates on merge can trigger the tag-driven Release
+          # workflow (release.yml), and so the promotion step below can push to
+          # main. The default GITHUB_TOKEN deliberately cannot trigger other
+          # workflows.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          # dev is the integration branch: PRs merge into dev and release-please
+          # tracks its commits, opening the Release PR against dev.
+          target-branch: dev
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      # On release, promote the exact released commit (Cargo.toml/Cargo.lock
+      # bump + CHANGELOG, tagged vX.Y.Z) from dev to main, so main always points
+      # at the latest released commit. github.sha is that released commit; main
+      # is a strict ancestor of dev, so this is a fast-forward. Pushing a branch
+      # (not a tag) does not re-trigger release.yml.
+      - name: Checkout released commit
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+
+      - name: Promote release to main
+        if: ${{ steps.release.outputs.release_created }}
+        run: git push origin HEAD:main
