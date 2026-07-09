@@ -1,6 +1,6 @@
 # gitid
 
-Switch between git identities — name/email, SSH key, commit signing, and GitHub
+Switch between git identities. Name/email, SSH key, commit signing, and GitHub
 CLI auth — automatically, per directory tree. Assign a profile to a directory
 **from anywhere**, without `cd`-ing there and without touching any repo's local
 config.
