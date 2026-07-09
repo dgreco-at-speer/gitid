@@ -104,6 +104,17 @@ Identity works without it. Install once for `GH_CONFIG_DIR` switching:
 <shell>` prints the script; `gitid env --shell <shell>` is the hot path the hook
 calls and must never be invoked for its side effects manually.
 
+## MCP server (native tools instead of the CLI)
+
+If your harness speaks MCP, gitid can expose these operations as typed tools
+rather than shell commands. Register it once with `gitid mcp install` (supports
+`claude-code`, `cursor`, `opencode`; `--project` for a repo-local config). The
+harness then launches `gitid mcp serve` per session. Tools mirror the CLI:
+`gitid_list`/`gitid_show`/`gitid_dirs`/`gitid_current`/`gitid_doctor` (read) and
+`gitid_use`/`gitid_forget`/`gitid_add`/`gitid_edit`/`gitid_remove`/`gitid_sync`
+(write). `gitid_add` is non-interactive by construction — pass `git_name` and
+`email` (and `signing`/`signing_key` when signing).
+
 ## When NOT to use gitid
 
 - Don't hand-edit `~/.local/share/gitid/*` (generated; rerun `gitid sync`).

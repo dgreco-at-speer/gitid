@@ -64,6 +64,8 @@ pub enum Command {
     Init,
     /// Update gitid to the latest release.
     Update(UpdateArgs),
+    /// Run or install the gitid MCP server.
+    Mcp(McpArgs),
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -250,6 +252,54 @@ pub struct SetupArgs {
 pub struct CompletionsArgs {
     #[arg(value_enum)]
     pub shell: Shell,
+}
+
+#[derive(Debug, Args)]
+pub struct McpArgs {
+    #[command(subcommand)]
+    pub command: McpCommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum McpCommand {
+    /// Run the MCP server over stdio (invoked by an agent harness).
+    Serve,
+    /// Register gitid as an MCP server in agent-harness configs.
+    Install(McpInstallArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct McpInstallArgs {
+    /// Harness(es) to configure (default: all supported).
+    #[arg(value_enum)]
+    pub client: Vec<McpClient>,
+    /// Write the project-local config instead of the global/user config.
+    #[arg(long)]
+    pub project: bool,
+    /// Print the config that would be written; modify nothing.
+    #[arg(long)]
+    pub print: bool,
+    /// Write without prompting.
+    #[arg(long, short = 'y')]
+    pub yes: bool,
+}
+
+/// Agent harnesses `gitid mcp install` knows how to configure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum McpClient {
+    #[value(name = "claude-code")]
+    ClaudeCode,
+    Cursor,
+    Opencode,
+}
+
+impl McpClient {
+    /// Every harness `install` configures when none is named explicitly.
+    pub const ALL: [McpClient; 3] = [
+        McpClient::ClaudeCode,
+        McpClient::Cursor,
+        McpClient::Opencode,
+    ];
 }
 
 #[derive(Debug, Args)]

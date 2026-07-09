@@ -4,7 +4,7 @@ pub(crate) mod add;
 mod completions;
 mod current;
 mod dirs;
-mod doctor;
+pub(crate) mod doctor;
 mod edit;
 mod env;
 mod hook;
@@ -20,7 +20,7 @@ use std::process::ExitCode;
 
 use anyhow::Result;
 
-use crate::cli::{Cli, Command};
+use crate::cli::{Cli, Command, McpCommand};
 use crate::paths::{GitidPaths, expand_tilde};
 
 /// Shared state for command handlers.
@@ -68,6 +68,10 @@ fn dispatch(ctx: &Ctx, command: Command) -> Result<ExitCode> {
         Command::Completions(args) => completions::run(&args)?,
         Command::Init => sync::init(ctx)?,
         Command::Update(args) => return crate::update::run(ctx, &args),
+        Command::Mcp(args) => match args.command {
+            McpCommand::Serve => return crate::mcp::serve(ctx).map(|()| ExitCode::SUCCESS),
+            McpCommand::Install(a) => crate::mcp::install(ctx, &a)?,
+        },
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -83,6 +87,7 @@ fn should_notify(command: &Command) -> bool {
             | Command::Completions(_)
             | Command::Current(_)
             | Command::Update(_)
+            | Command::Mcp(_)
     )
 }
 

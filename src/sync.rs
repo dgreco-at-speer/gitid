@@ -6,6 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{Context, Result, bail};
+use serde::Serialize;
 
 use crate::gitconfig::{ensure_include, render_fragment, render_include};
 use crate::paths::{GitidPaths, PathStyle};
@@ -14,7 +15,7 @@ use crate::store::mappings::MappingsFile;
 use crate::store::profiles::{Profile, ProfilesFile};
 
 /// Summary of what `sync_all` changed, for human-readable reporting.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize)]
 pub struct SyncReport {
     pub fragments_written: Vec<String>,
     pub fragments_pruned: Vec<String>,

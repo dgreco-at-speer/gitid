@@ -8,6 +8,7 @@ pub mod activation;
 pub mod cli;
 pub mod cmd;
 pub mod gitconfig;
+pub mod mcp;
 pub mod output;
 pub mod paths;
 pub mod shell;

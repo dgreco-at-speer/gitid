@@ -8,6 +8,7 @@ use std::process::{Command, ExitCode};
 use anyhow::Result;
 use owo_colors::OwoColorize;
 use owo_colors::Stream::Stdout;
+use serde::Serialize;
 
 use crate::cli::DoctorArgs;
 use crate::cmd::{Ctx, resolve_dir};
@@ -19,24 +20,64 @@ use crate::paths::PathStyle;
 use crate::store::mappings::MappingsFile;
 use crate::store::profiles::{self, SigningFormat};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Status {
+#[derive(Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Status {
     Ok,
     Warn,
     Fail,
 }
 
-struct Report {
-    failed: bool,
+/// A single diagnostic result. Collected by [`collect`] so both the CLI printer
+/// and the `gitid_doctor` MCP tool can consume the same checks.
+#[derive(Clone, Serialize)]
+pub struct Finding {
+    pub status: Status,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hint: Option<String>,
+}
+
+#[derive(Default)]
+pub struct Report {
+    pub findings: Vec<Finding>,
 }
 
 impl Report {
-    fn new() -> Self {
-        Self { failed: false }
+    fn check(&mut self, status: Status, msg: impl AsRef<str>, hint: Option<&str>) {
+        self.findings.push(Finding {
+            status,
+            message: msg.as_ref().to_string(),
+            hint: hint.map(str::to_string),
+        });
     }
 
-    fn check(&mut self, status: Status, msg: impl AsRef<str>, hint: Option<&str>) {
-        let glyph = match status {
+    /// Whether any check failed (drives the CLI's non-zero exit).
+    pub fn failed(&self) -> bool {
+        self.findings.iter().any(|f| f.status == Status::Fail)
+    }
+}
+
+/// Run every diagnostic check and return the findings without emitting output.
+pub fn collect(ctx: &Ctx, dir: Option<&str>) -> Result<Report> {
+    let mut r = Report::default();
+
+    check_git(&mut r);
+    check_bootstrap(ctx, &mut r)?;
+    check_artifacts(ctx, &mut r)?;
+    check_mappings(ctx, &mut r, dir)?;
+    check_keys(ctx, &mut r)?;
+    check_gh(ctx, &mut r);
+    check_hook(ctx, &mut r);
+
+    Ok(r)
+}
+
+pub fn run(ctx: &Ctx, args: &DoctorArgs) -> Result<ExitCode> {
+    let report = collect(ctx, args.dir.as_deref())?;
+
+    for f in &report.findings {
+        let glyph = match f.status {
             Status::Ok => "✓"
                 .if_supports_color(Stdout, |t| t.green().to_string())
                 .to_string(),
@@ -47,32 +88,17 @@ impl Report {
                 .if_supports_color(Stdout, |t| t.red().to_string())
                 .to_string(),
         };
-        println!("{glyph} {}", msg.as_ref());
-        if let Some(h) = hint {
+        println!("{glyph} {}", f.message);
+        if let Some(h) = &f.hint {
             println!(
                 "    {} {h}",
                 "→".if_supports_color(Stdout, |t| t.cyan().to_string())
             );
         }
-        if status == Status::Fail {
-            self.failed = true;
-        }
     }
-}
-
-pub fn run(ctx: &Ctx, args: &DoctorArgs) -> Result<ExitCode> {
-    let mut r = Report::new();
-
-    check_git(&mut r);
-    check_bootstrap(ctx, &mut r)?;
-    check_artifacts(ctx, &mut r)?;
-    check_mappings(ctx, &mut r, args)?;
-    check_keys(ctx, &mut r)?;
-    check_gh(ctx, &mut r);
-    check_hook(ctx, &mut r);
 
     println!();
-    if r.failed {
+    if report.failed() {
         println!(
             "{}",
             "doctor found problems (see ✗ above)"
@@ -162,7 +188,7 @@ fn check_artifacts(ctx: &Ctx, r: &mut Report) -> Result<()> {
     Ok(())
 }
 
-fn check_mappings(ctx: &Ctx, r: &mut Report, args: &DoctorArgs) -> Result<()> {
+fn check_mappings(ctx: &Ctx, r: &mut Report, dir: Option<&str>) -> Result<()> {
     let profiles = profiles::load(&ctx.paths.profiles_toml())?;
     let mappings = MappingsFile::load(&ctx.paths.mappings_toml())?;
 
@@ -194,7 +220,7 @@ fn check_mappings(ctx: &Ctx, r: &mut Report, args: &DoctorArgs) -> Result<()> {
     }
 
     // Precedence probe for the requested (or current) directory if it is a repo.
-    let probe = resolve_dir(args.dir.as_deref(), &ctx.paths.home)?;
+    let probe = resolve_dir(dir, &ctx.paths.home)?;
     if is_in_repo(&probe) {
         if let Some(mapping) =
             crate::store::mappings::match_dir(&mappings.mappings, &probe, PathStyle::host())

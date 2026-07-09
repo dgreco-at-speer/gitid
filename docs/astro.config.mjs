@@ -1,6 +1,7 @@
 // @ts-check
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
+import starlightLlmsTxt from "starlight-llms-txt";
 
 // The deployment target is not decided yet. When a host is chosen, set
 // DOCS_SITE / DOCS_BASE in the deploy environment, e.g.
@@ -13,6 +14,14 @@ export default defineConfig({
       title: "gitid",
       description:
         "Switch between git identities — name/email, SSH key, commit signing, GitHub CLI auth — automatically, per directory tree.",
+      plugins: [
+        // Generate /llms.txt, /llms-full.txt and /llms-small.txt for LLM
+        // consumers. These links need an absolute site URL, so only register
+        // the plugin when the deploy host is configured (DOCS_SITE) — matching
+        // the site/base env-var pattern above. Without DOCS_SITE (CI/local PR
+        // builds) the plugins array is empty and behaviour is unchanged.
+        ...(process.env.DOCS_SITE ? [starlightLlmsTxt()] : []),
+      ],
       components: {
         // Override the splash hero to render the animated bian lian octocat
         // mascot when a page declares no `hero.image`.
@@ -45,8 +54,11 @@ export default defineConfig({
             "guides/github-cli",
             "guides/prompt-integration",
             "guides/self-update",
-            "guides/ai-agents",
           ],
+        },
+        {
+          label: "AI",
+          items: ["ai/overview", "ai/mcp-server", "ai/agent-skills"],
         },
         {
           label: "Reference",

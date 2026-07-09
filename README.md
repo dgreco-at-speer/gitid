@@ -208,6 +208,8 @@ function prompt_gitid() { [[ -n $GITID_PROFILE ]] && p10k segment -f yellow -t $
 | `gitid env --shell <s>` | Print activation for a directory (used by hooks) |
 | `gitid hook <shell>` | Print the shell hook script |
 | `gitid setup [shell]` | Install the hook into your rc file |
+| `gitid mcp serve` | Run the MCP server over stdio (for agent harnesses) |
+| `gitid mcp install [client…]` | Register the MCP server in agent harness configs |
 | `gitid completions <shell>` | Print shell completions |
 | `gitid update` | Update gitid to the latest release |
 | `gitid update --check` | Check for a newer release without installing |
@@ -233,6 +235,30 @@ Knobs (environment variables): `GITID_REPO`, `GITID_VERSION` (pin a specific tag
 `GITID_NO_UPDATE_CHECK` (disable the background check entirely), and
 `GITID_UPDATE_INTERVAL` (override the check interval, in seconds).
 
+## MCP server
+
+gitid ships a [Model Context Protocol](https://modelcontextprotocol.io) server so
+agents can drive it natively (instead of shelling out and parsing text). It is a
+stdio server: the harness spawns `gitid mcp serve` as a child process per session
+— there is no daemon or socket to manage.
+
+Register it once, globally, with:
+
+```sh
+gitid mcp install                 # all supported harnesses
+gitid mcp install claude-code     # or name specific ones: claude-code, cursor, opencode
+gitid mcp install cursor --project   # write the project-local config instead of the user config
+gitid mcp install opencode --print   # show what would be written, change nothing
+```
+
+`install` merges a `gitid` entry into each harness's MCP config (`~/.claude.json`,
+`~/.cursor/mcp.json`, `~/.config/opencode/opencode.json`, or the `--project`
+equivalents), preserving everything else, and prompts before writing (`--yes` to
+skip). The server exposes read tools (`gitid_list`, `gitid_show`, `gitid_dirs`,
+`gitid_current`, `gitid_doctor`) and write tools (`gitid_use`, `gitid_forget`,
+`gitid_add`, `gitid_edit`, `gitid_remove`, `gitid_sync`); every mutation flows
+through the same sync step as the CLI.
+
 ## For AI agents
 
 [`skills/gitid/`](skills/gitid/SKILL.md) is a portable, LLM-agnostic Agent Skill
@@ -240,3 +266,6 @@ that teaches any agent how to drive gitid — the mental model, core workflow, a
 how to diagnose "commits show the wrong identity". Use it with Claude Code / the
 Agent SDK (symlink into `~/.claude/skills/`), reference it from another agent's
 rules, or paste `SKILL.md` into any chat LLM. See [`skills/README.md`](skills/README.md).
+
+Agents that speak MCP can instead use the built-in server above (`gitid mcp
+install`), which exposes the same operations as typed tools.

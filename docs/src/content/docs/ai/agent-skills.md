@@ -1,5 +1,5 @@
 ---
-title: Using gitid with AI agents
+title: Agent Skill
 description: gitid ships a portable Agent Skill that teaches any LLM agent the mental model, core workflow, and diagnosis order for driving gitid.
 ---
 
@@ -8,6 +8,8 @@ gitid ships a portable, LLM-agnostic **Agent Skill** in [`skills/gitid/`](https:
 - `SKILL.md` — the mental model (identity flows through git conditional includes; never edit a repo's local config), the core workflow, and the diagnosis order for "commits show the wrong identity"
 - `reference.md` — every command and flag, the `profiles.toml`/`mappings.toml` schema, file layout, and environment variables
 - `troubleshooting.md` — a symptom → cause → fix table
+
+The skill teaches an agent *how gitid thinks*; the [MCP server](../mcp-server/) gives it *typed tools to act*. They complement each other — install both for the best results.
 
 ## Pointing an agent at the skill
 
@@ -50,3 +52,8 @@ gitid setup --yes                    # install the hook without prompting
 :::tip
 The skill also encodes what agents should *not* do — chiefly, never "fix" an identity by writing `user.email` into a repo's local config, which overrides gitid and reintroduces the original problem. See [Common issues](../../troubleshooting/common-issues/) for the same guidance in human form.
 :::
+
+## See also
+
+- [MCP server](../mcp-server/) — drive gitid through typed MCP tools instead of (or alongside) the skill.
+- [AI integration overview](../overview/) — MCP vs. skill, and when to use each.
