@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/dgreco-at-speer/gitid/compare/v0.6.0...v0.6.1) (2026-07-09)
+
+
+### Bug Fixes
+
+* **release:** repair main promotion and drop component from tags ([905b3f3](https://github.com/dgreco-at-speer/gitid/commit/905b3f328509be585a8b10ee9e19d2b56f9ba832))
+
 ## [0.6.0](https://github.com/dgreco-at-speer/gitid/compare/gitid-v0.5.1...gitid-v0.6.0) (2026-07-09)
 
 
