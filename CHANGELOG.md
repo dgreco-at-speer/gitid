@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/dgreco-at-speer/gitid/compare/gitid-v0.5.0...gitid-v0.5.1) (2026-07-09)
+
+
+### Bug Fixes
+
+* fix release please promotion ([6f02633](https://github.com/dgreco-at-speer/gitid/commit/6f02633ebdc19c327994561642957c16c5da3ae9))
+
 ## [0.5.0](https://github.com/dgreco-at-speer/gitid/compare/gitid-v0.4.0...gitid-v0.5.0) (2026-07-09)
 
 
