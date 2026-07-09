@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/dgreco-at-speer/gitid/compare/gitid-v0.4.0...gitid-v0.5.0) (2026-07-09)
+
+
+### Features
+
+* update README to trigger release ([0494d7a](https://github.com/dgreco-at-speer/gitid/commit/0494d7a7e26a7edc8956b2ef59395122ee0c424f))
+
 ## [0.4.0](https://github.com/dgreco-at-speer/gitid/compare/gitid-v0.3.0...gitid-v0.4.0) (2026-07-09)
 
 
