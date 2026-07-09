@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/dgreco-at-speer/gitid/compare/gitid-v0.5.1...gitid-v0.6.0) (2026-07-09)
+
+
+### Features
+
+* add profile creation command ([97d06c9](https://github.com/dgreco-at-speer/gitid/commit/97d06c906a3df5e422d27d5fa58107876c73d0fb))
+
 ## [0.5.1](https://github.com/dgreco-at-speer/gitid/compare/gitid-v0.5.0...gitid-v0.5.1) (2026-07-09)
 
 
