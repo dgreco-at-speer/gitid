@@ -32,15 +32,23 @@ jobs:
           manifest-file: .release-please-manifest.json
 
       # On release, promote the exact released commit (Cargo.toml/Cargo.lock
-      # bump + CHANGELOG, tagged vX.Y.Z) from dev to main, so main always points
-      # at the latest released commit. github.sha is that released commit; main
-      # is a strict ancestor of dev, so this is a fast-forward. Pushing a branch
-      # (not a tag) does not re-trigger release.yml.
+      # bump + CHANGELOG) from dev to main, so main always points at the latest
+      # released commit. github.sha is that released commit (the merge of the
+      # release PR into dev), and main is a strict ancestor of it, so the push
+      # is a fast-forward.
+      #
+      # fetch-depth MUST be 0 (full history). git verifies the fast-forward
+      # client-side against the remote tip it learns during the push; a shallow
+      # depth-1 checkout lacks the current main commit, so the push is rejected
+      # with "remote contains work that you do not have locally". Full history
+      # lets git see main is an ancestor and accept the fast-forward. Pushing a
+      # branch (not a tag) does not re-trigger release.yml.
       - name: Checkout released commit
         if: ${{ steps.release.outputs.release_created }}
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
       - name: Promote release to main
