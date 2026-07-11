@@ -27,8 +27,9 @@ gitid doctor [DIR]
 - **Generated files** — the per-profile fragments and the include manifest match what `gitid sync` would generate from `profiles.toml` and `mappings.toml` (stale files fail).
 - **Mappings** — at least one directory mapping exists; every mapping points at a known profile (unknown profiles fail) and at a directory that still exists (missing directories warn).
 - **Git resolution probe** — if `DIR` is inside a git repository and matches a mapping, doctor asks git what `user.email` actually resolves to there. If a repo-local or other config overrides the profile's email, it warns and names the overriding file.
-- **SSH keys** — each profile's SSH key exists, and (on Unix) is not group/world readable.
-- **Signing keys** — SSH-format signing keys exist on disk.
+- **SSH keys** — each profile's on-disk SSH key exists, and (on Unix) is not group/world readable.
+- **ssh-agent keys** — when any profile uses an agent-held key: the agent is reachable, each selector resolves to exactly one key, and the materialised public key under the data dir is current (unreachable agents warn; a key that was never materialised fails).
+- **Signing keys** — SSH-format signing keys exist on disk; a `"agent"` signing key requires the profile's SSH key to be agent-held. Warns when git is older than 2.34 (SSH signing needs it).
 - **GitHub CLI** — if any profile enables gh isolation, the `gh` binary is available and each such profile has authenticated (`hosts.yml` present in its `GH_CONFIG_DIR`).
 - **Shell hook** — a `gitid hook` line is present in `~/.bashrc`, `~/.zshrc`, or the fish config.
 

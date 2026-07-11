@@ -84,6 +84,73 @@ profile's repos, defeating the per-directory design. So gitid intentionally
 carries SSH config only through git config, which resolves per repository.
 Don't export it yourself either.
 
+## Keys held by the ssh-agent
+
+A profile's key does not have to live on disk. Hardware tokens, Secretive, the
+1Password agent, and the Windows OpenSSH agent all hold private keys that never
+exist as files. Reference one by a *selector* instead of a path:
+
+```toml
+[profiles.work.ssh]
+agent = "SHA256:eCEOtaIJH8nAEgkqjT98fzQPv4yYrLi3KNsphPVe1Lk"
+# or by comment:  agent = "jane@corp.example"
+```
+
+The selector is either a `SHA256:` fingerprint (a unique prefix is enough) or a
+key comment (exact match, falling back to a unique substring) — the same values
+`ssh-add -l` prints. An ambiguous selector is an error that lists the matching
+keys. On the command line, use `--ssh-agent-key`:
+
+```sh
+gitid add work --non-interactive \
+  --git-name "Jane Doe" --email jane@corp.example \
+  --ssh-agent-key jane@corp.example
+```
+
+The flag validates the selector against the running agent immediately, so typos
+fail at `add` time rather than at the next sync. The wizard lists agent keys
+alongside the ones discovered in `~/.ssh` (as `agent: …` entries) whenever an
+agent is reachable.
+
+### How it works
+
+ssh needs a file to select the key by, even when the private half lives in the
+agent. So `gitid sync` resolves the selector against the agent and writes the
+key's **public** half to `~/.local/share/gitid/ssh/<name>.pub`. The generated
+fragment points at that file:
+
+```ini
+[core]
+	sshCommand = ssh -i /home/jane/.local/share/gitid/ssh/work.pub -o IdentitiesOnly=yes
+```
+
+When `-i` names a public key with no private key file next to it, ssh asks the
+agent for the private operation — and `IdentitiesOnly=yes` still pins
+authentication to exactly that key. Commit signing works through the same file:
+set `key = "agent"` in the profile's `[signing]` table (see
+[Commit signing](../commit-signing/)).
+
+Because the profile stores only the selector, every sync re-resolves it. When
+the agent is unreachable (or the key was removed from it), sync keeps the
+previously materialised file and warns — repos keep working from the cached
+public key. Sync only fails when the key was never materialised at all, since
+the generated config would point at a file that doesn't exist.
+[`gitid doctor`](../../reference/commands/doctor/) reports whether the agent is
+reachable, whether each selector still resolves, and whether the materialised
+copy is current.
+
+### Finding the agent
+
+gitid connects to the agent at `SSH_AUTH_SOCK`. On Windows, when the variable
+is unset it falls back to the named pipe of the OpenSSH agent that ships with
+Windows (`\\.\pipe\openssh-ssh-agent`).
+
+:::caution
+Git for Windows' bundled ssh cannot talk to the Windows agent's named pipe.
+Put Windows' own OpenSSH (`C:\Windows\System32\OpenSSH`) first on `PATH` so
+the plain `ssh` in the generated `core.sshCommand` resolves to it.
+:::
+
 ## Worked example: two GitHub accounts
 
 One machine, a work GitHub account and a personal one, each with its own key:
@@ -140,4 +207,5 @@ GIT_SSH_COMMAND="ssh -v" git -C ~/src/work/api fetch   # -v shows the key offere
 ```
 
 If the wrong key wins, run `gitid doctor ~/src/work/api` — it checks that the
-mapping resolves, the generated files are current, and the key file exists.
+mapping resolves, the generated files are current, and the key exists (on disk,
+or in the agent for agent-held keys).

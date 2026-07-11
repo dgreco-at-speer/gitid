@@ -5,6 +5,7 @@
 //! tested. The binary in `main.rs` is a thin wrapper.
 
 pub mod activation;
+pub mod agent;
 pub mod cli;
 pub mod cmd;
 pub mod gitconfig;

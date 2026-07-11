@@ -8,9 +8,9 @@ use std::process::Command;
 
 use anyhow::{Context, Result};
 
-use crate::paths::{PathStyle, contract_home, expand_tilde, normalize_dir};
+use crate::paths::{GitidPaths, PathStyle, contract_home, expand_tilde, normalize_dir};
 use crate::store::mappings::Mapping;
-use crate::store::profiles::{Profile, SigningFormat};
+use crate::store::profiles::{Profile, SIGNING_KEY_AGENT, SigningFormat, Ssh};
 
 /// Quote a gitconfig *value* if it needs it. Values containing `#`, `;`, `"`,
 /// `\`, or leading/trailing whitespace are wrapped in double quotes with `\` and
@@ -87,7 +87,10 @@ pub fn gitdir_pattern(dir: &str, icase: bool, home: &str, style: PathStyle) -> S
 
 /// Render a profile's gitconfig fragment. SSH and signing key paths are expanded
 /// to absolute (a quoted `~` inside `core.sshCommand` would not be shell-expanded).
-pub fn render_fragment(profile: &Profile, home: &Path) -> String {
+/// Agent-held keys point at the public key `gitid sync` materialises under the
+/// data dir; ssh resolves the private half via the agent.
+pub fn render_fragment(name: &str, profile: &Profile, paths: &GitidPaths) -> String {
+    let home = &paths.home;
     let mut out = String::new();
     out.push_str("# Managed by gitid. Do not edit; run `gitid sync` to regenerate.\n");
 
@@ -96,6 +99,7 @@ pub fn render_fragment(profile: &Profile, home: &Path) -> String {
     out.push_str(&format!("\temail = {}\n", quote_git_value(&profile.email)));
     if let Some(signing) = &profile.signing {
         let key = match signing.format {
+            SigningFormat::Ssh if signing.key == SIGNING_KEY_AGENT => derived_pub_str(name, paths),
             SigningFormat::Ssh => abs_path_str(&signing.key, home),
             SigningFormat::Openpgp => signing.key.clone(),
         };
@@ -118,8 +122,11 @@ pub fn render_fragment(profile: &Profile, home: &Path) -> String {
     }
 
     if let Some(ssh) = &profile.ssh {
-        let key = abs_path_str(&ssh.key, home);
-        let cmd = format!("ssh -i {key} -o IdentitiesOnly=yes");
+        let key = match ssh {
+            Ssh::Path(p) => abs_path_str(&p.key, home),
+            Ssh::Agent(_) => derived_pub_str(name, paths),
+        };
+        let cmd = format!("ssh -i {} -o IdentitiesOnly=yes", shell_quote_arg(&key));
         out.push_str("[core]\n");
         out.push_str(&format!("\tsshCommand = {}\n", quote_git_value(&cmd)));
     }
@@ -142,6 +149,32 @@ fn abs_path_str(input: &str, home: &Path) -> String {
     let s = expanded.to_string_lossy().into_owned();
     // Forward slashes are accepted by git and ssh on every platform.
     s.replace('\\', "/")
+}
+
+/// The derived public-key path for an agent-held key, as a gitconfig value.
+fn derived_pub_str(name: &str, paths: &GitidPaths) -> String {
+    paths.ssh_pub(name).to_string_lossy().replace('\\', "/")
+}
+
+/// Quote an argument for the POSIX shell git runs `core.sshCommand` through.
+/// Only quotes when needed (whitespace or shell-special characters).
+fn shell_quote_arg(arg: &str) -> String {
+    let special = |c: char| {
+        c.is_whitespace() || matches!(c, '\'' | '"' | '\\' | '$' | '`' | '&' | ';' | '(' | ')')
+    };
+    if !arg.is_empty() && !arg.chars().any(special) {
+        return arg.to_string();
+    }
+    let mut out = String::with_capacity(arg.len() + 2);
+    out.push('"');
+    for c in arg.chars() {
+        if matches!(c, '"' | '\\' | '$' | '`') {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out.push('"');
+    out
 }
 
 /// Split a flattened config key like `core.autocrlf` or
@@ -456,9 +489,7 @@ mod tests {
         Profile {
             name: "Jane Doe".into(),
             email: "jane@corp.example".into(),
-            ssh: Some(Ssh {
-                key: "~/.ssh/id_work".into(),
-            }),
+            ssh: Some(Ssh::from_path("~/.ssh/id_work")),
             signing: Some(Signing {
                 format: SigningFormat::Ssh,
                 key: "~/.ssh/id_work.pub".into(),
@@ -471,9 +502,18 @@ mod tests {
         }
     }
 
+    fn test_paths(home: &str) -> GitidPaths {
+        let home = PathBuf::from(home);
+        GitidPaths {
+            config_dir: home.join(".config/gitid"),
+            data_dir: home.join(".local/share/gitid"),
+            home,
+        }
+    }
+
     #[test]
     fn fragment_full() {
-        let frag = render_fragment(&profile_all(), Path::new("/home/jane"));
+        let frag = render_fragment("work", &profile_all(), &test_paths("/home/jane"));
         assert!(frag.contains("name = Jane Doe"));
         assert!(frag.contains("email = jane@corp.example"));
         assert!(frag.contains("signingkey = /home/jane/.ssh/id_work.pub"));
@@ -495,10 +535,58 @@ mod tests {
             env: BTreeMap::new(),
             extra: BTreeMap::new(),
         };
-        let frag = render_fragment(&p, Path::new("/home/pat"));
+        let frag = render_fragment("pat", &p, &test_paths("/home/pat"));
         assert!(frag.contains("name = Pat"));
         assert!(!frag.contains("[gpg]"));
         assert!(!frag.contains("[core]"));
+    }
+
+    #[test]
+    fn fragment_agent_key() {
+        let mut p = profile_all();
+        p.ssh = Some(Ssh::from_agent("SHA256:abcdef"));
+        p.signing = Some(Signing {
+            format: SigningFormat::Ssh,
+            key: SIGNING_KEY_AGENT.into(),
+            commits: true,
+            tags: None,
+        });
+        let frag = render_fragment("work", &p, &test_paths("/home/jane"));
+        let pub_path = "/home/jane/.local/share/gitid/ssh/work.pub";
+        assert!(
+            frag.contains(&format!(
+                "sshCommand = ssh -i {pub_path} -o IdentitiesOnly=yes"
+            )),
+            "{frag}"
+        );
+        assert!(frag.contains(&format!("signingkey = {pub_path}")), "{frag}");
+        assert!(frag.contains("format = ssh"));
+        // The selector itself never appears in derived config.
+        assert!(!frag.contains("SHA256:abcdef"));
+    }
+
+    #[test]
+    fn fragment_quotes_paths_with_spaces() {
+        let p = profile_all();
+        let frag = render_fragment("work", &p, &test_paths("/home/Jane Doe"));
+        assert!(
+            frag.contains(
+                "sshCommand = \"ssh -i \\\"/home/Jane Doe/.ssh/id_work\\\" -o IdentitiesOnly=yes\""
+            ),
+            "{frag}"
+        );
+    }
+
+    #[test]
+    fn shell_quoting() {
+        assert_eq!(shell_quote_arg("/home/jane/.ssh/id"), "/home/jane/.ssh/id");
+        assert_eq!(
+            shell_quote_arg("/home/Jane Doe/key"),
+            "\"/home/Jane Doe/key\""
+        );
+        assert_eq!(shell_quote_arg("a\"b"), "\"a\\\"b\"");
+        assert_eq!(shell_quote_arg("a$b"), "\"a\\$b\"");
+        assert_eq!(shell_quote_arg(""), "\"\"");
     }
 
     #[test]
@@ -510,7 +598,7 @@ mod tests {
             commits: false,
             tags: None,
         });
-        let frag = render_fragment(&p, Path::new("/home/jane"));
+        let frag = render_fragment("work", &p, &test_paths("/home/jane"));
         assert!(frag.contains("signingkey = ABCD1234"));
         assert!(frag.contains("format = openpgp"));
         assert!(!frag.contains("[commit]"));
@@ -524,7 +612,7 @@ mod tests {
             "url.git@github.com-work:.insteadOf".into(),
             "git@github.com:".into(),
         );
-        let frag = render_fragment(&p, Path::new("/home/jane"));
+        let frag = render_fragment("work", &p, &test_paths("/home/jane"));
         assert!(frag.contains("[core]\n\tautocrlf = input"));
         assert!(frag.contains("[url \"git@github.com-work:\"]\n\tinsteadOf = git@github.com:"));
     }

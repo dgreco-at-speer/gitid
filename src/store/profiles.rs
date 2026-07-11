@@ -53,11 +53,68 @@ pub struct Profile {
     pub extra: BTreeMap<String, String>,
 }
 
+/// Where a profile's SSH key lives. Serialised untagged, so the TOML is either
+/// `key = "<path>"` (on disk) or `agent = "<selector>"` (in the ssh-agent).
+/// The inner structs deny unknown fields so a table with both keys is an error
+/// rather than a silent pick.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Ssh {
+#[serde(
+    untagged,
+    expecting = "ssh needs either `key = \"<private key path>\"` or `agent = \"<SHA256:fingerprint or comment>\"`"
+)]
+pub enum Ssh {
+    /// On-disk private key.
+    Path(SshPath),
+    /// Key held by the running ssh-agent. `gitid sync` resolves the selector
+    /// against the agent and materialises the public key into the data dir.
+    Agent(SshAgent),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SshPath {
     /// Path to the private key (may contain a leading `~`).
     pub key: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SshAgent {
+    /// A `SHA256:` fingerprint (prefix match allowed) or a key comment.
+    pub agent: String,
+}
+
+impl Ssh {
+    pub fn from_path(key: impl Into<String>) -> Self {
+        Ssh::Path(SshPath { key: key.into() })
+    }
+
+    pub fn from_agent(selector: impl Into<String>) -> Self {
+        Ssh::Agent(SshAgent {
+            agent: selector.into(),
+        })
+    }
+
+    /// The private-key path, when this key lives on disk.
+    pub fn path(&self) -> Option<&str> {
+        match self {
+            Ssh::Path(p) => Some(&p.key),
+            Ssh::Agent(_) => None,
+        }
+    }
+
+    /// The agent selector, when this key lives in the ssh-agent.
+    pub fn agent_selector(&self) -> Option<&str> {
+        match self {
+            Ssh::Path(_) => None,
+            Ssh::Agent(a) => Some(&a.agent),
+        }
+    }
+}
+
+/// Sentinel [`Signing::key`] value meaning "sign with the profile's agent key"
+/// (rendered as the derived public-key file path).
+pub const SIGNING_KEY_AGENT: &str = "agent";
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -69,7 +126,8 @@ pub enum SigningFormat {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Signing {
     pub format: SigningFormat,
-    /// For `ssh`: path to the public key. For `openpgp`: the key id.
+    /// For `ssh`: path to the public key, or [`SIGNING_KEY_AGENT`] to sign with
+    /// the profile's agent key. For `openpgp`: the key id.
     pub key: String,
     #[serde(default)]
     pub commits: bool,
@@ -202,9 +260,7 @@ mod tests {
         Profile {
             name: "Jane Doe".into(),
             email: "jane@corp.example".into(),
-            ssh: Some(Ssh {
-                key: "~/.ssh/id_ed25519_work".into(),
-            }),
+            ssh: Some(Ssh::from_path("~/.ssh/id_ed25519_work")),
             signing: Some(Signing {
                 format: SigningFormat::Ssh,
                 key: "~/.ssh/id_ed25519_work.pub".into(),
@@ -253,6 +309,69 @@ email = \"pat@example.com\"
         assert_eq!(parsed.profiles.len(), 2);
         assert_eq!(parsed.profiles["work"].name, "Jane Doe");
         assert_eq!(parsed.profiles["work"], sample());
+    }
+
+    #[test]
+    fn ssh_path_toml_round_trip() {
+        let src = "\
+version = 1
+
+[profiles.work]
+name = \"Jane\"
+email = \"jane@corp.example\"
+
+[profiles.work.ssh]
+key = \"~/.ssh/id_work\"
+";
+        let parsed: ProfilesFile = toml_edit::de::from_str(src).unwrap();
+        let ssh = parsed.profiles["work"].ssh.as_ref().unwrap();
+        assert_eq!(ssh.path(), Some("~/.ssh/id_work"));
+        assert_eq!(ssh.agent_selector(), None);
+    }
+
+    #[test]
+    fn ssh_agent_toml_round_trip() {
+        let src = "\
+version = 1
+
+[profiles.work]
+name = \"Jane\"
+email = \"jane@corp.example\"
+
+[profiles.work.ssh]
+agent = \"SHA256:abcdef\"
+";
+        let parsed: ProfilesFile = toml_edit::de::from_str(src).unwrap();
+        let ssh = parsed.profiles["work"].ssh.as_ref().unwrap();
+        assert_eq!(ssh.agent_selector(), Some("SHA256:abcdef"));
+        assert_eq!(ssh.path(), None);
+
+        // And through the document writer.
+        let mut doc = new_document();
+        let mut p = sample();
+        p.ssh = Some(Ssh::from_agent("jane@corp"));
+        upsert_profile(&mut doc, "work", &p).unwrap();
+        let reparsed: ProfilesFile = toml_edit::de::from_str(&doc.to_string()).unwrap();
+        assert_eq!(reparsed.profiles["work"], p);
+    }
+
+    #[test]
+    fn ssh_both_fields_is_an_error() {
+        let src = "\
+version = 1
+
+[profiles.work]
+name = \"Jane\"
+email = \"jane@corp.example\"
+
+[profiles.work.ssh]
+key = \"~/.ssh/id_work\"
+agent = \"SHA256:abcdef\"
+";
+        let err = toml_edit::de::from_str::<ProfilesFile>(src)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("ssh needs either"), "{err}");
     }
 
     #[test]

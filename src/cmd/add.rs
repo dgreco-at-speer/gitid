@@ -56,7 +56,14 @@ pub fn build_non_interactive(args: &AddArgs) -> Result<Profile> {
         .clone()
         .ok_or_else(|| anyhow::anyhow!("--email is required in non-interactive mode"))?;
 
-    let ssh = args.ssh_key.clone().map(|key| Ssh { key });
+    let ssh = match (&args.ssh_key, &args.ssh_agent_key) {
+        (Some(key), _) => Some(Ssh::from_path(key.clone())),
+        (None, Some(selector)) => {
+            crate::agent::validate_selector(selector)?;
+            Some(Ssh::from_agent(selector.clone()))
+        }
+        (None, None) => None,
+    };
 
     let signing = match args.signing {
         None | Some(SigningKind::None) => None,

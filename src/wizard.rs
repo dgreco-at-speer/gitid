@@ -5,10 +5,11 @@ use std::fmt;
 use anyhow::{Result, bail};
 use inquire::{Confirm, Select, Text};
 
+use crate::agent::AgentKey;
 use crate::cli::{AddArgs, NewArgs};
 use crate::cmd::Ctx;
 use crate::ssh::SshKey;
-use crate::store::profiles::{Gh, Profile, Signing, SigningFormat, Ssh};
+use crate::store::profiles::{Gh, Profile, SIGNING_KEY_AGENT, Signing, SigningFormat, Ssh};
 
 const NAV_HELP: &str = "type to filter · ↑↓ to move · enter to select";
 
@@ -143,10 +144,10 @@ fn prompt_new_ssh_key(ctx: &Ctx, name: &str, email: &str, args: &NewArgs) -> Res
         }
         NewSshChoice::Enter => {
             let key = Text::new("Path to existing SSH private key:").prompt()?;
-            Ok(Some(Ssh { key }))
+            Ok(Some(Ssh::from_path(key)))
         }
         NewSshChoice::None => Ok(None),
-        NewSshChoice::Key(k) => Ok(Some(Ssh { key: k.path })),
+        NewSshChoice::Key(k) => Ok(Some(Ssh::from_path(k.path))),
     }
 }
 
@@ -162,9 +163,7 @@ fn generate_at(ctx: &Ctx, name: &str, email: &str, key: &str, args: &NewArgs) ->
             crate::output::info(&format!("reusing existing SSH key {key} (not overwritten)"))
         }
     }
-    Ok(Ssh {
-        key: key.to_string(),
-    })
+    Ok(Ssh::from_path(key))
 }
 
 fn prompt_new_signing(git_name: &str, email: &str, ssh: Option<&Ssh>) -> Result<Option<Signing>> {
@@ -179,7 +178,10 @@ fn prompt_new_signing(git_name: &str, email: &str, ssh: Option<&Ssh>) -> Result<
     };
     let key = match format {
         SigningFormat::Ssh => {
-            let default = ssh.map(|s| format!("{}.pub", s.key)).unwrap_or_default();
+            let default = ssh
+                .and_then(|s| s.path())
+                .map(|p| format!("{p}.pub"))
+                .unwrap_or_default();
             Text::new("Path to SSH public signing key:")
                 .with_default(&default)
                 .prompt()?
@@ -208,9 +210,11 @@ fn prompt_new_signing(git_name: &str, email: &str, ssh: Option<&Ssh>) -> Result<
     }))
 }
 
-/// One entry in the SSH-key picker: a discovered key or one of two sentinels.
+/// One entry in the SSH-key picker: a discovered key file, a key held by the
+/// ssh-agent, or one of two sentinels.
 enum SshChoice {
     Key(SshKey),
+    Agent(AgentKey),
     None,
     Enter,
 }
@@ -219,6 +223,7 @@ impl fmt::Display for SshChoice {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             SshChoice::Key(k) => write!(f, "{k}"),
+            SshChoice::Agent(k) => write!(f, "agent: {}", k.label()),
             SshChoice::None => write!(f, "(none)"),
             SshChoice::Enter => write!(f, "(enter a path…)"),
         }
@@ -227,12 +232,23 @@ impl fmt::Display for SshChoice {
 
 fn prompt_ssh_key(ctx: &Ctx, args: &AddArgs) -> Result<Option<Ssh>> {
     if let Some(key) = &args.ssh_key {
-        return Ok(Some(Ssh { key: key.clone() }));
+        return Ok(Some(Ssh::from_path(key.clone())));
+    }
+    if let Some(selector) = &args.ssh_agent_key {
+        crate::agent::validate_selector(selector)?;
+        return Ok(Some(Ssh::from_agent(selector.clone())));
     }
     let mut options: Vec<SshChoice> = crate::ssh::discover(&ctx.paths.home)
         .into_iter()
         .map(SshChoice::Key)
         .collect();
+    // Best-effort: no running agent just means no agent entries.
+    options.extend(
+        crate::agent::list_keys()
+            .unwrap_or_default()
+            .into_iter()
+            .map(SshChoice::Agent),
+    );
     options.push(SshChoice::None);
     options.push(SshChoice::Enter);
     let page = options.len().clamp(3, 12);
@@ -244,9 +260,12 @@ fn prompt_ssh_key(ctx: &Ctx, args: &AddArgs) -> Result<Option<Ssh>> {
         SshChoice::None => Ok(None),
         SshChoice::Enter => {
             let key = Text::new("Path to SSH private key:").prompt()?;
-            Ok(Some(Ssh { key }))
+            Ok(Some(Ssh::from_path(key)))
         }
-        SshChoice::Key(k) => Ok(Some(Ssh { key: k.path })),
+        SshChoice::Key(k) => Ok(Some(Ssh::from_path(k.path))),
+        // The fingerprint is the canonical selector: comments may be empty or
+        // shared between keys.
+        SshChoice::Agent(k) => Ok(Some(Ssh::from_agent(k.fingerprint()))),
     }
 }
 
@@ -260,8 +279,23 @@ fn prompt_signing(ssh: Option<&Ssh>) -> Result<Option<Signing>> {
         "openpgp" => SigningFormat::Openpgp,
         _ => unreachable!(),
     };
+    // An agent-held key signs via the "agent" sentinel; no prompt needed.
+    if format == SigningFormat::Ssh && ssh.is_some_and(|s| s.agent_selector().is_some()) {
+        let commits = Confirm::new("Sign commits by default?")
+            .with_default(true)
+            .prompt()?;
+        return Ok(Some(Signing {
+            format,
+            key: SIGNING_KEY_AGENT.to_string(),
+            commits,
+            tags: None,
+        }));
+    }
     let default_key = match format {
-        SigningFormat::Ssh => ssh.map(|s| format!("{}.pub", s.key)).unwrap_or_default(),
+        SigningFormat::Ssh => ssh
+            .and_then(|s| s.path())
+            .map(|p| format!("{p}.pub"))
+            .unwrap_or_default(),
         SigningFormat::Openpgp => String::new(),
     };
     let prompt = match format {

@@ -73,10 +73,15 @@ pub struct AddParams {
     /// Path to the SSH private key (a leading `~` is allowed).
     #[serde(default)]
     pub ssh_key: Option<String>,
+    /// Use a key from the running ssh-agent instead of a key file: a SHA256:
+    /// fingerprint (prefix ok) or a key comment. Mutually exclusive with ssh_key.
+    #[serde(default)]
+    pub ssh_agent_key: Option<String>,
     /// Commit-signing method: "ssh", "openpgp", or "none".
     #[serde(default)]
     pub signing: Option<String>,
-    /// Signing key: public-key path (ssh) or key id (openpgp).
+    /// Signing key: public-key path (ssh), key id (openpgp), or "agent" to sign
+    /// with the profile's ssh-agent key.
     #[serde(default)]
     pub signing_key: Option<String>,
     /// Sign commits by default.
@@ -100,6 +105,10 @@ pub struct EditParams {
     /// New SSH private-key path.
     #[serde(default)]
     pub ssh_key: Option<String>,
+    /// Switch to a key from the running ssh-agent: a SHA256: fingerprint
+    /// (prefix ok) or a key comment. Mutually exclusive with ssh_key.
+    #[serde(default)]
+    pub ssh_agent_key: Option<String>,
     /// New signing method: "ssh", "openpgp", or "none".
     #[serde(default)]
     pub signing: Option<String>,
@@ -311,10 +320,21 @@ impl GitidServer {
 
         let signing = build_signing(p.signing.as_deref(), p.signing_key.clone(), p.sign_commits)
             .map_err(invalid_from)?;
+        let ssh = match (&p.ssh_key, &p.ssh_agent_key) {
+            (Some(_), Some(_)) => {
+                return Err(invalid("ssh_key and ssh_agent_key are mutually exclusive"));
+            }
+            (Some(key), None) => Some(Ssh::from_path(key.clone())),
+            (None, Some(selector)) => {
+                crate::agent::validate_selector(selector).map_err(invalid_from)?;
+                Some(Ssh::from_agent(selector.clone()))
+            }
+            (None, None) => None,
+        };
         let profile = Profile {
             name: p.git_name.clone(),
             email: p.email.clone(),
-            ssh: p.ssh_key.clone().map(|key| Ssh { key }),
+            ssh,
             signing,
             gh: p.gh.unwrap_or(true).then_some(Gh { enabled: true }),
             env: BTreeMap::new(),
@@ -353,8 +373,15 @@ impl GitidServer {
         if let Some(v) = &p.email {
             profile.email = v.clone();
         }
+        if p.ssh_key.is_some() && p.ssh_agent_key.is_some() {
+            return Err(invalid("ssh_key and ssh_agent_key are mutually exclusive"));
+        }
         if let Some(v) = &p.ssh_key {
-            profile.ssh = Some(Ssh { key: v.clone() });
+            profile.ssh = Some(Ssh::from_path(v.clone()));
+        }
+        if let Some(v) = &p.ssh_agent_key {
+            crate::agent::validate_selector(v).map_err(invalid_from)?;
+            profile.ssh = Some(Ssh::from_agent(v.clone()));
         }
         if let Some(kind) = p.signing.as_deref() {
             match kind {

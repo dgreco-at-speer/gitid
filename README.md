@@ -45,6 +45,7 @@ config and comments are never rewritten.
 ~/.config/gitid/mappings.toml       # directory → profile assignments (machine-owned)
 ~/.local/share/gitid/include.gitconfig        # generated manifest of includeIf directives
 ~/.local/share/gitid/profiles/<name>.gitconfig # generated per-profile fragment
+~/.local/share/gitid/ssh/<name>.pub  # public key materialised for agent-held keys
 ~/.local/share/gitid/gh/<name>/      # per-profile GH_CONFIG_DIR (gh tokens live here)
 ```
 
@@ -137,12 +138,16 @@ version = 1
 name  = "Jane Doe"                  # → user.name
 email = "jane@corp.example"         # → user.email
 
-[profiles.work.ssh]
+[profiles.work.ssh]                 # exactly one of `key` or `agent`:
 key = "~/.ssh/id_work"              # → core.sshCommand = "ssh -i … -o IdentitiesOnly=yes"
+# agent = "SHA256:…"                # …or a key held by the ssh-agent (fingerprint or
+                                    # comment, as in `ssh-add -l`); sync materialises its
+                                    # public key and points core.sshCommand at it
 
 [profiles.work.signing]
 format  = "ssh"                     # "ssh" | "openpgp"  → gpg.format
-key     = "~/.ssh/id_work.pub"      # ssh: public-key path; openpgp: key id
+key     = "~/.ssh/id_work.pub"      # ssh: public-key path (or "agent" for the profile's
+                                    # agent-held key); openpgp: key id
 commits = true                      # → commit.gpgsign
 tags    = false                     # → tag.gpgsign (optional)
 
@@ -186,7 +191,10 @@ function prompt_gitid() { [[ -n $GITID_PROFILE ]] && p10k segment -f yellow -t $
   won't apply; `gitid doctor` warns about this.
 - **SSH agent.** gitid sets `core.sshCommand` with `-o IdentitiesOnly=yes` so the
   right key is used even when an agent holds several. It does **not** switch
-  `SSH_AUTH_SOCK`.
+  `SSH_AUTH_SOCK`. Keys that live *only* in the agent (hardware tokens, Secretive,
+  the Windows OpenSSH agent) are supported too: set `agent = "<fingerprint or
+  comment>"` instead of `key`, or pass `--ssh-agent-key` — gitid materialises the
+  public key and lets ssh fetch the private half from the agent.
 - **`GIT_SSH_COMMAND`** is intentionally never exported — an env var would
   override `core.sshCommand` for every repo in the shell, defeating the design.
 - Requires git ≥ 2.13. Windows is best-effort (PowerShell hook provided; CI

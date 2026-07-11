@@ -5,7 +5,7 @@ use anyhow::{Result, bail};
 use crate::cli::{DetailFormat, ShowArgs};
 use crate::cmd::Ctx;
 use crate::store::mappings::MappingsFile;
-use crate::store::profiles::{self, SigningFormat};
+use crate::store::profiles::{self, SigningFormat, Ssh};
 
 pub fn run(ctx: &Ctx, args: &ShowArgs) -> Result<()> {
     let profiles = profiles::load(&ctx.paths.profiles_toml())?;
@@ -28,8 +28,24 @@ pub fn run(ctx: &Ctx, args: &ShowArgs) -> Result<()> {
             println!("{} {}", dim("profile:"), args.name);
             println!("  {}   {}", dim("name:"), profile.name);
             println!("  {}  {}", dim("email:"), profile.email);
-            if let Some(ssh) = &profile.ssh {
-                println!("  {}    {}", dim("ssh:"), ssh.key);
+            match &profile.ssh {
+                Some(Ssh::Path(p)) => println!("  {}    {}", dim("ssh:"), p.key),
+                Some(Ssh::Agent(a)) => {
+                    // Best-effort live lookup; an unreachable agent still shows
+                    // the stored selector.
+                    let resolved = crate::agent::list_keys().ok().and_then(|keys| {
+                        crate::agent::select(&keys, &a.agent)
+                            .ok()
+                            .map(|k| k.label())
+                    });
+                    match resolved {
+                        Some(label) => {
+                            println!("  {}    agent {} ({label})", dim("ssh:"), a.agent)
+                        }
+                        None => println!("  {}    agent {}", dim("ssh:"), a.agent),
+                    }
+                }
+                None => {}
             }
             if let Some(signing) = &profile.signing {
                 let fmt = match signing.format {

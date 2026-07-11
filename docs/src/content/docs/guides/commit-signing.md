@@ -86,6 +86,36 @@ no `--sign-commits` flag; to toggle default signing on an existing profile,
 edit `commits` in `profiles.toml` and run `gitid sync`.
 :::
 
+### Signing with an agent-held key
+
+When the profile's SSH key lives in the ssh-agent rather than on disk (see
+[SSH keys](../ssh-keys/#keys-held-by-the-ssh-agent)), there is no `.pub` file
+to point at. Use the literal value `agent` as the signing key:
+
+```sh
+gitid add work --non-interactive \
+  --git-name "Jane Doe" --email jane@corp.example \
+  --ssh-agent-key jane@corp.example \
+  --signing ssh --signing-key agent --sign-commits
+```
+
+```toml
+[profiles.work.ssh]
+agent = "jane@corp.example"
+
+[profiles.work.signing]
+format  = "ssh"
+key     = "agent"
+commits = true
+```
+
+`user.signingkey` then points at the public key gitid materialises from the
+agent (`~/.local/share/gitid/ssh/work.pub`), and `ssh-keygen` fetches the
+signing operation from the agent — the private key never touches disk. SSH
+signing via `user.signingkey` needs git ≥ 2.34; `gitid doctor` warns on older
+versions. The wizard picks `agent` automatically when you chose an agent key
+and ssh signing.
+
 ## Worked example: OpenPGP signing
 
 Find your key id, then use it (not a path) as the signing key:

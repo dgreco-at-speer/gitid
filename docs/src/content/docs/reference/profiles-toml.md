@@ -23,14 +23,20 @@ version = 1
 name  = "Jane Doe"                  # required → user.name
 email = "jane@corp.example"         # required → user.email
 
-[profiles.work.ssh]                 # optional table
-key = "~/.ssh/id_work"              # required within [ssh]; path to the PRIVATE key.
+[profiles.work.ssh]                 # optional table; exactly ONE of `key` or `agent`
+key = "~/.ssh/id_work"              # path to the PRIVATE key.
                                     # → core.sshCommand = "ssh -i <abs path> -o IdentitiesOnly=yes"
+# agent = "SHA256:…"                # …or a key held by the ssh-agent, selected by
+                                    # SHA256: fingerprint (prefix ok) or comment.
+                                    # `gitid sync` materialises its public key into the
+                                    # data dir and points core.sshCommand at that file.
 
 [profiles.work.signing]             # optional table
 format  = "ssh"                     # required within [signing]: "ssh" | "openpgp" → gpg.format
 key     = "~/.ssh/id_work.pub"      # required within [signing].
-                                    #   ssh:     path to the PUBLIC key (expanded to absolute)
+                                    #   ssh:     path to the PUBLIC key (expanded to absolute),
+                                    #            or "agent" to sign with the profile's
+                                    #            agent-held key
                                     #   openpgp: the key id, written verbatim
                                     # → user.signingkey
 commits = true                      # optional, default false. true → commit.gpgsign = true
@@ -83,16 +89,21 @@ Generated git config:
 
 ## `[profiles.<name>.ssh]`
 
+The table takes exactly **one** of these two fields (both at once is a parse error):
+
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `key` | string | yes | Path to the SSH **private** key. A leading `~` is expanded to an absolute path in the generated config. |
+| `key` | string | one of the two | Path to the SSH **private** key on disk. A leading `~` is expanded to an absolute path in the generated config. |
+| `agent` | string | one of the two | Selector for a key held by the running ssh-agent: a `SHA256:` fingerprint (a unique prefix is enough) or a key comment (exact match, else unique substring) — the values `ssh-add -l` prints. |
 
-Generated git config:
+Generated git config for `key`:
 
 ```ini
 [core]
 	sshCommand = ssh -i /home/jane/.ssh/id_work -o IdentitiesOnly=yes
 ```
+
+For `agent`, [`gitid sync`](../commands/sync/) resolves the selector against the agent, writes the key's public half to `<data dir>/ssh/<name>.pub`, and points `core.sshCommand` at that file — ssh then fetches the private operation from the agent. When the agent is unreachable, sync keeps the previously materialised file and warns; it fails only if the key was never materialised. See [SSH keys](../../guides/ssh-keys/#keys-held-by-the-ssh-agent) for how the agent is located (on Windows the OpenSSH agent's named pipe is the default when `SSH_AUTH_SOCK` is unset).
 
 `-o IdentitiesOnly=yes` ensures the right key is offered even when an ssh-agent holds several. gitid never exports `GIT_SSH_COMMAND` (an env var would override `core.sshCommand` for every repo in the shell).
 
@@ -101,7 +112,7 @@ Generated git config:
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `format` | `"ssh"` \| `"openpgp"` | yes | Signing backend. Maps to `gpg.format`. |
-| `key` | string | yes | For `ssh`: path to the **public** key, expanded to absolute. For `openpgp`: the key id, written verbatim. Maps to `user.signingkey`. |
+| `key` | string | yes | For `ssh`: path to the **public** key, expanded to absolute — or the literal value `"agent"` to sign with the profile's agent-held key (requires `ssh = { agent = "…" }`; resolves to the materialised `<data dir>/ssh/<name>.pub`). For `openpgp`: the key id, written verbatim. Maps to `user.signingkey`. |
 | `commits` | boolean | no (default `false`) | `true` writes `commit.gpgsign = true`. `false` writes nothing (git's default applies). |
 | `tags` | boolean | no | Only `true` writes `tag.gpgsign = true`; `false` or absent writes nothing. |
 
