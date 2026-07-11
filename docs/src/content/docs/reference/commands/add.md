@@ -22,8 +22,9 @@ gitid add [OPTIONS] [NAME]
 | `--git-name <GIT_NAME>` | git `user.name`. Required with `--non-interactive`. |
 | `--email <EMAIL>` | git `user.email`. Required with `--non-interactive`. |
 | `--ssh-key <SSH_KEY>` | Path to the SSH private key (becomes `core.sshCommand` with `-o IdentitiesOnly=yes`). |
+| `--ssh-agent-key <SELECTOR>` | Use a key held by the ssh-agent instead of a key file: a `SHA256:` fingerprint (prefix ok) or a key comment, as printed by `ssh-add -l`. Validated against the running agent. Conflicts with `--ssh-key`. |
 | `--signing <SIGNING>` | Commit-signing method. Possible values: `ssh`, `openpgp`, `none`. |
-| `--signing-key <SIGNING_KEY>` | Signing key: public-key path (`ssh`) or key id (`openpgp`). Required when `--signing` is `ssh` or `openpgp`. |
+| `--signing-key <SIGNING_KEY>` | Signing key: public-key path (`ssh`), key id (`openpgp`), or `agent` to sign with the profile's agent-held key. Required when `--signing` is `ssh` or `openpgp`. |
 | `--sign-commits` | Sign commits by default (`commit.gpgsign = true`). |
 | `--gh` | Provision an isolated `GH_CONFIG_DIR` for this profile. This is the default; the flag exists to override an earlier `--no-gh`. |
 | `--no-gh` | Do not provision a gh config dir. |
@@ -55,6 +56,15 @@ $ gitid add personal
 > Commit signing: none
 > Isolate GitHub CLI auth for this profile? Yes
 ✓ added profile "personal"
+```
+
+Use a key from the ssh-agent (a hardware token, Secretive, the Windows OpenSSH
+agent, …) instead of a key file, and sign commits with it too:
+
+```console
+$ gitid add work --non-interactive --git-name "Jane Doe" --email jane@corp.example \
+      --ssh-agent-key jane@corp.example --signing ssh --signing-key agent --sign-commits
+✓ added profile "work"
 ```
 
 Create a profile without GitHub CLI isolation:

@@ -74,7 +74,7 @@ fn build_non_interactive(ctx: &Ctx, name: &str, args: &NewArgs) -> Result<Profil
         let outcome =
             provision::generate_ssh_key(key, &ctx.paths.home, &comment, args.ssh_type, false)?;
         report_ssh(key, outcome);
-        Some(Ssh { key: key.clone() })
+        Some(Ssh::from_path(key.clone()))
     } else {
         None
     };
@@ -116,12 +116,12 @@ fn build_signing(
             let key = match &args.signing_key {
                 Some(k) => k.clone(),
                 None => {
-                    let ssh = ssh.ok_or_else(|| {
+                    let key = ssh.and_then(Ssh::path).ok_or_else(|| {
                         anyhow::anyhow!(
                             "--signing ssh needs an SSH key: pass --signing-key or drop --no-ssh"
                         )
                     })?;
-                    format!("{}.pub", ssh.key)
+                    format!("{key}.pub")
                 }
             };
             (SigningFormat::Ssh, key)
@@ -187,8 +187,8 @@ fn github_followup(ctx: &Ctx, name: &str, profile: &Profile) -> Result<()> {
         }
     }
 
-    if let Some(ssh) = &profile.ssh {
-        let pub_key = expand_tilde(&format!("{}.pub", ssh.key), &ctx.paths.home);
+    if let Some(key) = profile.ssh.as_ref().and_then(Ssh::path) {
+        let pub_key = expand_tilde(&format!("{key}.pub"), &ctx.paths.home);
         if pub_key.exists()
             && inquire::Confirm::new("Upload the SSH public key to GitHub?")
                 .with_default(false)
@@ -217,8 +217,9 @@ fn github_followup(ctx: &Ctx, name: &str, profile: &Profile) -> Result<()> {
 
 /// Print copy-pasteable next steps so a declined follow-up still leaves guidance.
 fn next_steps(ctx: &Ctx, name: &str, profile: &Profile) {
-    if let Some(ssh) = &profile.ssh {
-        output::info(&format!("SSH public key: {}.pub", ssh.key));
+    let ssh_path = profile.ssh.as_ref().and_then(Ssh::path);
+    if let Some(key) = ssh_path {
+        output::info(&format!("SSH public key: {key}.pub"));
     }
     if profile.gh_enabled() {
         let gh_dir = ctx.paths.gh_dir(name);
@@ -226,11 +227,10 @@ fn next_steps(ctx: &Ctx, name: &str, profile: &Profile) {
             "authenticate GitHub: GH_CONFIG_DIR={} gh auth login",
             gh_dir.display()
         ));
-        if let Some(ssh) = &profile.ssh {
+        if let Some(key) = ssh_path {
             output::hint(&format!(
-                "upload SSH key:      GH_CONFIG_DIR={} gh ssh-key add {}.pub",
-                gh_dir.display(),
-                ssh.key
+                "upload SSH key:      GH_CONFIG_DIR={} gh ssh-key add {key}.pub",
+                gh_dir.display()
             ));
         }
     }

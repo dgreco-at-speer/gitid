@@ -45,7 +45,13 @@ impl TestEnv {
             .env("GIT_CONFIG_GLOBAL", self.global_gitconfig())
             .env("GIT_CONFIG_NOSYSTEM", "1")
             .env_remove("XDG_CONFIG_HOME")
-            .env_remove("XDG_DATA_HOME");
+            .env_remove("XDG_DATA_HOME")
+            // The developer's own shell may have an active gitid profile and a
+            // running ssh-agent; neither may leak into assertions.
+            .env_remove("GITID_PROFILE")
+            .env_remove("GITID_STATE")
+            .env_remove("GH_CONFIG_DIR")
+            .env_remove("SSH_AUTH_SOCK");
         cmd
     }
 

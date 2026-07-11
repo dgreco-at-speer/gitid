@@ -33,6 +33,8 @@ The environment variables `GITID_CONFIG_DIR` and `GITID_DATA_DIR` override these
 ├── profiles/
 │   ├── personal.gitconfig              # per-profile gitconfig fragment
 │   └── work.gitconfig
+├── ssh/
+│   └── work.pub                        # public key materialised from the ssh-agent
 └── gh/
     ├── personal/                       # per-profile GH_CONFIG_DIR (gh tokens)
     └── work/
@@ -115,6 +117,10 @@ Details of the generated patterns:
 - Literal glob metacharacters (`*`, `?`, `[`) in paths are escaped.
 - Blocks are ordered by ascending directory length, so a more specific (longer) directory comes last and wins under git's last-one-wins precedence.
 - A mapping whose typed path differed from its canonical (symlink-resolved) path gets a second block for the literal path.
+
+### `ssh/<name>.pub` — materialised agent keys
+
+Written for every profile whose key lives in the ssh-agent (`ssh = { agent = "…" }` in `profiles.toml`). Sync resolves the selector against the running agent and writes the matching public key here; the profile's fragment points `core.sshCommand` (and, with `signing.key = "agent"`, `user.signingkey`) at this file. When the agent is unreachable, sync keeps the existing file and warns, so repos keep working from the cached copy. Files for profiles that no longer use an agent key are pruned. See [SSH keys](../../guides/ssh-keys/#keys-held-by-the-ssh-agent).
 
 ### `gh/<name>/` — isolated GitHub CLI config
 

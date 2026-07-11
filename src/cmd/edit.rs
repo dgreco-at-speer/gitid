@@ -34,7 +34,11 @@ pub fn run(ctx: &Ctx, args: &EditArgs) -> Result<()> {
         profile.email = v.clone();
     }
     if let Some(v) = &args.ssh_key {
-        profile.ssh = Some(Ssh { key: v.clone() });
+        profile.ssh = Some(Ssh::from_path(v.clone()));
+    }
+    if let Some(v) = &args.ssh_agent_key {
+        crate::agent::validate_selector(v)?;
+        profile.ssh = Some(Ssh::from_agent(v.clone()));
     }
     if let Some(kind) = args.signing {
         match kind {

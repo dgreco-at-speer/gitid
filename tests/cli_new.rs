@@ -41,7 +41,7 @@ fn new_generates_ssh_key_and_writes_profile() {
     assert_eq!(profile.name, "Jane Doe");
     assert_eq!(profile.email, "jane@corp.example");
     assert_eq!(
-        profile.ssh.as_ref().map(|s| s.key.as_str()),
+        profile.ssh.as_ref().and_then(|s| s.path()),
         Some(key.to_string_lossy().as_ref())
     );
 

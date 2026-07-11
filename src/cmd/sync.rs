@@ -33,6 +33,9 @@ pub fn report_changes(report: &SyncReport) {
             "mapping references unknown profile {profile:?}; run `gitid use` or remove it"
         ));
     }
+    for warning in &report.warnings {
+        output::warn(warning);
+    }
     if report.global_include_added {
         output::success("added gitid include to your global gitconfig");
     }
@@ -48,6 +51,18 @@ pub fn report_changes(report: &SyncReport) {
     }
     if !report.fragments_pruned.is_empty() {
         bits.push(format!("{} pruned", report.fragments_pruned.len()));
+    }
+    if !report.ssh_pubs_written.is_empty() {
+        bits.push(format!(
+            "{} agent key(s) materialised",
+            report.ssh_pubs_written.len()
+        ));
+    }
+    if !report.ssh_pubs_pruned.is_empty() {
+        bits.push(format!(
+            "{} agent key(s) pruned",
+            report.ssh_pubs_pruned.len()
+        ));
     }
     if !report.gh_dirs_created.is_empty() {
         bits.push(format!(

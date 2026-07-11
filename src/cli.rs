@@ -144,10 +144,15 @@ pub struct AddArgs {
     /// Path to the SSH private key.
     #[arg(long = "ssh-key")]
     pub ssh_key: Option<String>,
+    /// Use a key from the ssh-agent instead of a key file: pass a SHA256:
+    /// fingerprint (prefix ok) or a key comment (see `ssh-add -l`).
+    #[arg(long = "ssh-agent-key", conflicts_with = "ssh_key")]
+    pub ssh_agent_key: Option<String>,
     /// Commit-signing method.
     #[arg(long, value_enum)]
     pub signing: Option<SigningKind>,
-    /// Signing key: public-key path (ssh) or key id (openpgp).
+    /// Signing key: public-key path (ssh), key id (openpgp), or "agent" to
+    /// sign with the profile's ssh-agent key.
     #[arg(long = "signing-key")]
     pub signing_key: Option<String>,
     /// Sign commits by default.
@@ -221,6 +226,10 @@ pub struct EditArgs {
     pub email: Option<String>,
     #[arg(long = "ssh-key")]
     pub ssh_key: Option<String>,
+    /// Switch to a key from the ssh-agent: a SHA256: fingerprint (prefix ok)
+    /// or a key comment (see `ssh-add -l`).
+    #[arg(long = "ssh-agent-key", conflicts_with = "ssh_key")]
+    pub ssh_agent_key: Option<String>,
     #[arg(long, value_enum)]
     pub signing: Option<SigningKind>,
     #[arg(long = "signing-key")]

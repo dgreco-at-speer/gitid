@@ -104,6 +104,16 @@ impl GitidPaths {
         self.data_dir.join("gh").join(profile)
     }
 
+    /// Directory holding public keys materialised from the ssh-agent.
+    pub fn ssh_pub_dir(&self) -> PathBuf {
+        self.data_dir.join("ssh")
+    }
+
+    /// The derived public-key file for a profile whose key lives in the agent.
+    pub fn ssh_pub(&self, profile: &str) -> PathBuf {
+        self.ssh_pub_dir().join(format!("{profile}.pub"))
+    }
+
     /// Machine-owned cache for the opportunistic update check (last-checked
     /// timestamp + newest version seen).
     pub fn update_state_json(&self) -> PathBuf {

@@ -19,17 +19,23 @@ use crate::store::profiles::{Profile, ProfilesFile};
 pub struct SyncReport {
     pub fragments_written: Vec<String>,
     pub fragments_pruned: Vec<String>,
+    pub ssh_pubs_written: Vec<String>,
+    pub ssh_pubs_pruned: Vec<String>,
     pub gh_dirs_created: Vec<String>,
     pub include_changed: bool,
     pub mappings_changed: bool,
     pub global_include_added: bool,
     pub dangling_mappings: Vec<String>,
+    /// Non-fatal problems (e.g. an unreachable ssh-agent with a cached key).
+    pub warnings: Vec<String>,
 }
 
 impl SyncReport {
     pub fn is_noop(&self) -> bool {
         self.fragments_written.is_empty()
             && self.fragments_pruned.is_empty()
+            && self.ssh_pubs_written.is_empty()
+            && self.ssh_pubs_pruned.is_empty()
             && self.gh_dirs_created.is_empty()
             && !self.include_changed
             && !self.mappings_changed
@@ -71,6 +77,7 @@ pub fn sync_all(paths: &GitidPaths) -> Result<SyncReport> {
     let mut mappings = MappingsFile::load(&paths.mappings_toml())?;
     let mut report = SyncReport::default();
 
+    sync_agent_pubkeys(paths, &profiles, &mut report)?;
     write_fragments(paths, &profiles, &mut report)?;
     prune_fragments(paths, &profiles, &mut report)?;
     refresh_mapping_env(paths, &profiles, &mut mappings, &mut report)?;
@@ -88,11 +95,101 @@ fn write_fragments(
     report: &mut SyncReport,
 ) -> Result<()> {
     for (name, profile) in &profiles.profiles {
-        let fragment = render_fragment(profile, &paths.home);
+        let fragment = render_fragment(name, profile, paths);
         let path = paths.fragment(name);
         if file_differs(&path, &fragment)? {
             atomic_write(&path, &fragment)?;
             report.fragments_written.push(name.clone());
+        }
+    }
+    Ok(())
+}
+
+/// Materialise the public key of every agent-held profile key into
+/// `<data_dir>/ssh/<name>.pub` (referenced by the rendered fragments), and prune
+/// files for profiles that no longer use the agent.
+///
+/// When the agent is unreachable or the selector no longer resolves, a
+/// previously materialised key is kept with a warning; failing to resolve a key
+/// that was never materialised is an error, because the generated config would
+/// point at a file that does not exist.
+fn sync_agent_pubkeys(
+    paths: &GitidPaths,
+    profiles: &ProfilesFile,
+    report: &mut SyncReport,
+) -> Result<()> {
+    let wanted: BTreeMap<&str, &str> = profiles
+        .profiles
+        .iter()
+        .filter_map(|(name, p)| {
+            p.ssh
+                .as_ref()
+                .and_then(|s| s.agent_selector())
+                .map(|sel| (name.as_str(), sel))
+        })
+        .collect();
+
+    prune_ssh_pubkeys(paths, &wanted, report)?;
+    if wanted.is_empty() {
+        return Ok(());
+    }
+
+    let keys = crate::agent::list_keys();
+    for (name, selector) in wanted {
+        let target = paths.ssh_pub(name);
+        let resolved = match &keys {
+            Ok(keys) => crate::agent::select(keys, selector).map_err(|e| format!("{e:#}")),
+            Err(e) => Err(format!("{e:#}")),
+        };
+        match resolved {
+            Ok(key) => {
+                let contents = format!("{}\n", key.line());
+                if file_differs(&target, &contents)? {
+                    atomic_write(&target, &contents)?;
+                    report.ssh_pubs_written.push(name.to_string());
+                }
+            }
+            Err(e) if target.exists() => {
+                report.warnings.push(format!(
+                    "{name}: could not refresh the ssh-agent key: {e}; keeping {}",
+                    target.display()
+                ));
+            }
+            Err(e) => {
+                bail!(
+                    "profile {name}: could not resolve ssh-agent key {selector:?}: {e}\n\
+                     check the agent (`ssh-add -l`) and SSH_AUTH_SOCK, then run `gitid sync`"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+fn prune_ssh_pubkeys(
+    paths: &GitidPaths,
+    wanted: &BTreeMap<&str, &str>,
+    report: &mut SyncReport,
+) -> Result<()> {
+    let dir = paths.ssh_pub_dir();
+    let entries = match std::fs::read_dir(&dir) {
+        Ok(e) => e,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(e).with_context(|| format!("could not read {}", dir.display())),
+    };
+    for entry in entries {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("pub") {
+            continue;
+        }
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if !wanted.contains_key(stem) {
+            std::fs::remove_file(&path)
+                .with_context(|| format!("could not remove {}", path.display()))?;
+            report.ssh_pubs_pruned.push(stem.to_string());
         }
     }
     Ok(())

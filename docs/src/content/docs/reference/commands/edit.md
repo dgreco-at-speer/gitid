@@ -22,8 +22,9 @@ gitid edit [OPTIONS] <NAME>
 | `--git-name <GIT_NAME>` | Set git `user.name`. |
 | `--email <EMAIL>` | Set git `user.email`. |
 | `--ssh-key <SSH_KEY>` | Set the path to the SSH private key. |
+| `--ssh-agent-key <SELECTOR>` | Switch to a key held by the ssh-agent: a `SHA256:` fingerprint (prefix ok) or a key comment, as printed by `ssh-add -l`. Validated against the running agent. Conflicts with `--ssh-key`. |
 | `--signing <SIGNING>` | Set the commit-signing method. Possible values: `ssh`, `openpgp`, `none` (removes signing). |
-| `--signing-key <SIGNING_KEY>` | Signing key: public-key path (`ssh`) or key id (`openpgp`). Required with `--signing ssh`/`openpgp` unless the profile already has one. |
+| `--signing-key <SIGNING_KEY>` | Signing key: public-key path (`ssh`), key id (`openpgp`), or `agent` to sign with the profile's agent-held key. Required with `--signing ssh`/`openpgp` unless the profile already has one. |
 | `--open` | Open `profiles.toml` in `$EDITOR`, then sync. **Not implemented yet** — the command currently errors with the path to edit by hand. |
 
 ## Examples
@@ -39,6 +40,13 @@ Enable SSH commit signing on an existing profile:
 
 ```console
 $ gitid edit work --signing ssh --signing-key ~/.ssh/id_work.pub
+✓ updated profile "work"
+```
+
+Switch a profile from a key file to a key held by the ssh-agent:
+
+```console
+$ gitid edit work --ssh-agent-key SHA256:eCEOtaIJH8
 ✓ updated profile "work"
 ```
 

@@ -18,7 +18,7 @@ use crate::gitconfig::{
 };
 use crate::paths::PathStyle;
 use crate::store::mappings::MappingsFile;
-use crate::store::profiles::{self, SigningFormat};
+use crate::store::profiles::{self, SIGNING_KEY_AGENT, SigningFormat};
 
 #[derive(Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -67,6 +67,7 @@ pub fn collect(ctx: &Ctx, dir: Option<&str>) -> Result<Report> {
     check_artifacts(ctx, &mut r)?;
     check_mappings(ctx, &mut r, dir)?;
     check_keys(ctx, &mut r)?;
+    check_agent(ctx, &mut r)?;
     check_gh(ctx, &mut r);
     check_hook(ctx, &mut r);
 
@@ -157,11 +158,21 @@ fn check_artifacts(ctx: &Ctx, r: &mut Report) -> Result<()> {
     // Fragments match what sync would generate.
     let mut stale = false;
     for (name, profile) in &profiles.profiles {
-        let expected = render_fragment(profile, &ctx.paths.home);
+        let expected = render_fragment(name, profile, &ctx.paths);
         let path = ctx.paths.fragment(name);
         match std::fs::read_to_string(&path) {
             Ok(actual) if actual == expected => {}
             _ => stale = true,
+        }
+        // Agent-held keys must have been materialised (freshness vs the live
+        // agent is checked separately, without failing offline).
+        if profile
+            .ssh
+            .as_ref()
+            .is_some_and(|s| s.agent_selector().is_some())
+            && !ctx.paths.ssh_pub(name).exists()
+        {
+            stale = true;
         }
     }
     let expected_include = render_include(
@@ -252,9 +263,29 @@ fn check_mappings(ctx: &Ctx, r: &mut Report, dir: Option<&str>) -> Result<()> {
 
 fn check_keys(ctx: &Ctx, r: &mut Report) -> Result<()> {
     let profiles = profiles::load(&ctx.paths.profiles_toml())?;
+
+    // SSH signing needs git >= 2.34 (user.signingkey + gpg.format = ssh).
+    let any_ssh_signing = profiles.profiles.values().any(|p| {
+        p.signing
+            .as_ref()
+            .is_some_and(|s| s.format == SigningFormat::Ssh)
+    });
+    if any_ssh_signing {
+        if let Ok((maj, min)) = git_version() {
+            if (maj, min) < (2, 34) {
+                r.check(
+                    Status::Warn,
+                    format!("git {maj}.{min} does not support SSH commit signing"),
+                    Some("upgrade git to >= 2.34"),
+                );
+            }
+        }
+    }
+
     for (name, profile) in &profiles.profiles {
-        if let Some(ssh) = &profile.ssh {
-            let path = crate::paths::expand_tilde(&ssh.key, &ctx.paths.home);
+        // Agent-held keys have no file to stat; check_agent covers them.
+        if let Some(key) = profile.ssh.as_ref().and_then(|s| s.path()) {
+            let path = crate::paths::expand_tilde(key, &ctx.paths.home);
             if !path.exists() {
                 r.check(
                     Status::Warn,
@@ -267,15 +298,110 @@ fn check_keys(ctx: &Ctx, r: &mut Report) -> Result<()> {
         }
         if let Some(signing) = &profile.signing {
             if signing.format == SigningFormat::Ssh {
-                let path = crate::paths::expand_tilde(&signing.key, &ctx.paths.home);
-                if !path.exists() {
+                if signing.key == SIGNING_KEY_AGENT {
+                    if profile
+                        .ssh
+                        .as_ref()
+                        .and_then(|s| s.agent_selector())
+                        .is_none()
+                    {
+                        r.check(
+                            Status::Warn,
+                            format!(
+                                "{name}: signing key is \"agent\" but the profile's ssh key \
+                                 is not agent-held"
+                            ),
+                            Some(
+                                "use `agent = \"…\"` in the profile's ssh table, or point \
+                                 signing.key at a public key file",
+                            ),
+                        );
+                    }
+                } else {
+                    let path = crate::paths::expand_tilde(&signing.key, &ctx.paths.home);
+                    if !path.exists() {
+                        r.check(
+                            Status::Warn,
+                            format!("{name}: signing key not found: {}", path.display()),
+                            None,
+                        );
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Check that every agent-held key is actually present in the running agent and
+/// that its materialised public key is fresh. Unreachable agents are warnings —
+/// the derived config keeps working from the cached key.
+fn check_agent(ctx: &Ctx, r: &mut Report) -> Result<()> {
+    let profiles = profiles::load(&ctx.paths.profiles_toml())?;
+    let agent_profiles: Vec<(&String, &str)> = profiles
+        .profiles
+        .iter()
+        .filter_map(|(name, p)| {
+            p.ssh
+                .as_ref()
+                .and_then(|s| s.agent_selector())
+                .map(|sel| (name, sel))
+        })
+        .collect();
+    if agent_profiles.is_empty() {
+        return Ok(());
+    }
+
+    let keys = crate::output::with_spinner("checking ssh-agent…", crate::agent::list_keys);
+    let keys = match keys {
+        Ok(keys) => keys,
+        Err(e) => {
+            let hint = if cfg!(windows) {
+                "start the \"OpenSSH Authentication Agent\" service; note that Git for \
+                 Windows' bundled ssh cannot talk to it — put Windows OpenSSH first on PATH"
+            } else {
+                "start ssh-agent and set SSH_AUTH_SOCK"
+            };
+            r.check(
+                Status::Warn,
+                format!("ssh-agent not reachable: {e:#}"),
+                Some(hint),
+            );
+            for (name, _) in &agent_profiles {
+                if !ctx.paths.ssh_pub(name).exists() {
                     r.check(
-                        Status::Warn,
-                        format!("{name}: signing key not found: {}", path.display()),
-                        None,
+                        Status::Fail,
+                        format!("{name}: agent key was never materialised"),
+                        Some("run `gitid sync` while the agent is running"),
                     );
                 }
             }
+            return Ok(());
+        }
+    };
+
+    for (name, selector) in agent_profiles {
+        match crate::agent::select(&keys, selector) {
+            Ok(key) => {
+                let expected = format!("{}\n", key.line());
+                match std::fs::read_to_string(ctx.paths.ssh_pub(name)) {
+                    Ok(actual) if actual == expected => r.check(
+                        Status::Ok,
+                        format!("{name}: ssh-agent holds {}", key.fingerprint()),
+                        None,
+                    ),
+                    _ => r.check(
+                        Status::Warn,
+                        format!("{name}: materialised agent key is stale or missing"),
+                        Some("run `gitid sync`"),
+                    ),
+                }
+            }
+            Err(e) => r.check(
+                Status::Warn,
+                format!("{name}: {e:#}"),
+                Some("check `ssh-add -l`, then run `gitid sync`"),
+            ),
         }
     }
     Ok(())

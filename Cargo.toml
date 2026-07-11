@@ -23,6 +23,10 @@ comfy-table = { version = "7", default-features = false, features = [
 ] }
 indicatif = "0.17"
 etcetera = "0.11"
+# SSH agent connectivity (`ssh.agent` profile keys). `ssh-key` matches the
+# version ssh-agent-client-rs uses so the types unify.
+ssh-agent-client-rs = "1.1"
+ssh-key = "0.6"
 tempfile = "3"
 self-replace = "1"
 # MCP server (`gitid mcp serve`). `server`/`macros` are rmcp defaults; add the

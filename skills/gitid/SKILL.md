@@ -65,6 +65,14 @@ gitid use work ~/code/work           # nested → longer path wins inside it
 gitid use work .
 ```
 
+**Use a key held by the ssh-agent** (hardware token, Secretive, Windows OpenSSH
+agent) instead of a key file — the selector is a `SHA256:` fingerprint or a
+comment, as printed by `ssh-add -l`, and the agent must be running:
+```sh
+gitid add work --non-interactive --git-name "Jane Doe" --email jane@corp.example \
+  --ssh-agent-key jane@corp.example --signing ssh --signing-key agent --sign-commits
+```
+
 **Switch a directory to a different profile:** just run `gitid use` again with the
 new profile; the mapping is replaced.
 
