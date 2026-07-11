@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.0](https://github.com/dgreco-at-speer/gitid/compare/v0.6.1...v0.7.0) (2026-07-11)
+
+
+### Features
+
+* support SSH keys held by the ssh-agent ([38f0280](https://github.com/dgreco-at-speer/gitid/commit/38f0280d214bd1b3a54b763a9118081a50b83af2))
+* support SSH keys held by the ssh-agent ([84bb01c](https://github.com/dgreco-at-speer/gitid/commit/84bb01c30bab0e29cc1b8bbcd1017e9384f4329d))
+
 ## [0.6.1](https://github.com/dgreco-at-speer/gitid/compare/v0.6.0...v0.6.1) (2026-07-09)
 
 
