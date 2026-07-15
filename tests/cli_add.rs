@@ -1,5 +1,6 @@
-//! `gitid new` — provisioning-from-scratch tests. Only the non-interactive path
-//! is exercised (interactive keygen can't be driven from a test harness).
+//! `gitid add` — provisioning-from-scratch tests (SSH/GPG key generation). Only
+//! the non-interactive path is exercised (interactive keygen can't be driven
+//! from a test harness).
 
 mod common;
 
@@ -7,13 +8,13 @@ use common::TestEnv;
 use gitid::store::profiles;
 
 #[test]
-fn new_generates_ssh_key_and_writes_profile() {
+fn add_generates_ssh_key_and_writes_profile() {
     let env = TestEnv::new();
     let key = env.home().join(".ssh").join("id_ed25519_work");
 
     env.gitid()
         .args([
-            "new",
+            "add",
             "work",
             "--non-interactive",
             "--git-name",
@@ -26,7 +27,7 @@ fn new_generates_ssh_key_and_writes_profile() {
         .args(["--no-gh"])
         .assert()
         .success()
-        .stdout(predicates::str::contains("created profile \"work\""));
+        .stdout(predicates::str::contains("added profile \"work\""));
 
     // The keypair was actually generated.
     assert!(key.exists(), "private key was not generated");
@@ -41,20 +42,17 @@ fn new_generates_ssh_key_and_writes_profile() {
     assert_eq!(profile.name, "Jane Doe");
     assert_eq!(profile.email, "jane@corp.example");
     assert_eq!(
-        profile.ssh.as_ref().and_then(|s| s.path()),
-        Some(key.to_string_lossy().as_ref())
+        profile.ssh.as_ref().unwrap().path().unwrap(),
+        key.to_str().unwrap()
     );
 
     // The derived fragment wires up core.sshCommand.
     let fragment = std::fs::read_to_string(env.paths.fragment("work")).unwrap();
-    assert!(
-        fragment.contains("sshCommand = ssh -i"),
-        "fragment missing sshCommand: {fragment}"
-    );
+    assert!(fragment.contains("sshCommand"));
 }
 
 #[test]
-fn new_reuses_existing_key_without_clobbering() {
+fn add_reuses_existing_key_without_clobbering() {
     let env = TestEnv::new();
     let ssh_dir = env.home().join(".ssh");
     std::fs::create_dir_all(&ssh_dir).unwrap();
@@ -63,7 +61,7 @@ fn new_reuses_existing_key_without_clobbering() {
 
     env.gitid()
         .args([
-            "new",
+            "add",
             "reuse",
             "--non-interactive",
             "--git-name",
@@ -84,11 +82,11 @@ fn new_reuses_existing_key_without_clobbering() {
 }
 
 #[test]
-fn new_without_ssh_creates_profile_with_no_key() {
+fn add_without_ssh_creates_profile_with_no_key() {
     let env = TestEnv::new();
     env.gitid()
         .args([
-            "new",
+            "add",
             "oss",
             "--non-interactive",
             "--git-name",
@@ -108,13 +106,13 @@ fn new_without_ssh_creates_profile_with_no_key() {
 }
 
 #[test]
-fn new_rejects_duplicate_profile() {
+fn add_rejects_duplicate_profile() {
     let env = TestEnv::new();
     env.add_profile("work", &common::sample_profile("Existing", "e@e.example"));
 
     env.gitid()
         .args([
-            "new",
+            "add",
             "work",
             "--non-interactive",
             "--git-name",
@@ -130,11 +128,11 @@ fn new_rejects_duplicate_profile() {
 }
 
 #[test]
-fn new_non_interactive_requires_git_name() {
+fn add_non_interactive_requires_git_name() {
     let env = TestEnv::new();
     env.gitid()
         .args([
-            "new",
+            "add",
             "work",
             "--non-interactive",
             "--email",

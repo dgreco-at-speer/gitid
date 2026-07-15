@@ -64,12 +64,11 @@ gitid add <name> \
 ```
 
 With `--non-interactive`, gitid fails instead of prompting for anything
-missing: `--git-name` and `--email` are required, and `--signing-key` is
-required whenever `--signing` is `ssh` or `openpgp`. GitHub CLI isolation is
+missing: `--git-name` and `--email` are required. GitHub CLI isolation is
 **enabled by default**; pass `--no-gh` to opt out (`--gh` explicitly re-enables
-it).
-
-`gitid add` also answers to the alias `gitid new`.
+it). When `--signing` is `ssh`, the signing key defaults to the profile's SSH
+key `.pub`; when `openpgp`, a new GPG key is generated unless `--signing-key`
+names an existing one.
 
 ### Example: a full "work" profile
 
