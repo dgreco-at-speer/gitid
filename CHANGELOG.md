@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.0](https://github.com/dgreco-at-speer/gitid/compare/v0.7.0...v0.8.0) (2026-07-15)
+
+
+### Features
+
+* merge key generation into `add`, remove `new` command ([a24d808](https://github.com/dgreco-at-speer/gitid/commit/a24d80831cddbc2fc17856696ea75c5822a50d3e))
+* merge key generation into `add`, remove `new` command ([3cb42ce](https://github.com/dgreco-at-speer/gitid/commit/3cb42ce9cc8e688c091584d4624d1b0643f948d6))
+
 ## [0.7.0](https://github.com/dgreco-at-speer/gitid/compare/v0.6.1...v0.7.0) (2026-07-11)
 
 
