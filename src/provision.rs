@@ -1,5 +1,4 @@
-//! Credential provisioning for `gitid new`: generate SSH keypairs and GPG keys,
-//! and drive the isolated GitHub CLI (`gh`) for auth and key upload.
+//! Credential provisioning for `gitid add`: generate SSH keypairs and GPG keys,
 //!
 //! Unlike [`crate::ssh`] (which only *discovers* existing keys), everything here
 //! shells out to create new material. There is no central command runner in this

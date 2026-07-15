@@ -29,10 +29,8 @@ pub enum Command {
     /// List profiles.
     #[command(alias = "ls")]
     List(ListArgs),
-    /// Add a new profile from existing credentials.
+    /// Create a profile, optionally generating SSH/GPG keys.
     Add(AddArgs),
-    /// Provision a new profile from scratch (generate SSH/GPG keys).
-    New(NewArgs),
     /// Show a profile's details.
     Show(ShowArgs),
     /// Edit a profile.
@@ -96,7 +94,7 @@ pub enum SigningKind {
     None,
 }
 
-/// SSH key algorithm to generate with `gitid new`.
+/// SSH key algorithm to generate with `gitid add`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum SshKeyType {
     Ed25519,
@@ -138,21 +136,30 @@ pub struct AddArgs {
     /// git user.name.
     #[arg(long = "git-name")]
     pub git_name: Option<String>,
-    /// git user.email.
+    /// git user.email. Also used as the generated SSH key's comment.
     #[arg(long = "email")]
     pub email: Option<String>,
-    /// Path to the SSH private key.
+    /// Path for the SSH private key. If the file exists it is reused; if not,
+    /// a new keypair is generated there (becomes `core.sshCommand` with
+    /// `-o IdentitiesOnly=yes`).
     #[arg(long = "ssh-key")]
     pub ssh_key: Option<String>,
     /// Use a key from the ssh-agent instead of a key file: pass a SHA256:
     /// fingerprint (prefix ok) or a key comment (see `ssh-add -l`).
     #[arg(long = "ssh-agent-key", conflicts_with = "ssh_key")]
     pub ssh_agent_key: Option<String>,
+    /// Algorithm for a generated SSH key.
+    #[arg(long = "ssh-type", value_enum, default_value_t = SshKeyType::Ed25519)]
+    pub ssh_type: SshKeyType,
+    /// Do not provision an SSH key for this profile.
+    #[arg(long = "no-ssh", conflicts_with_all = ["ssh_key", "ssh_agent_key"])]
+    pub no_ssh: bool,
     /// Commit-signing method.
     #[arg(long, value_enum)]
     pub signing: Option<SigningKind>,
     /// Signing key: public-key path (ssh), key id (openpgp), or "agent" to
-    /// sign with the profile's ssh-agent key.
+    /// sign with the profile's ssh-agent key. When omitted, `ssh` reuses the
+    /// profile's SSH key `.pub` and `openpgp` generates a GPG key.
     #[arg(long = "signing-key")]
     pub signing_key: Option<String>,
     /// Sign commits by default.
@@ -165,47 +172,6 @@ pub struct AddArgs {
     #[arg(long = "no-gh")]
     pub no_gh: bool,
     /// Fail rather than prompt for missing fields.
-    #[arg(long = "non-interactive")]
-    pub non_interactive: bool,
-}
-
-#[derive(Debug, Args)]
-pub struct NewArgs {
-    /// Profile name (lowercase slug). Prompted if omitted in interactive mode.
-    pub name: Option<String>,
-    /// git user.name.
-    #[arg(long = "git-name")]
-    pub git_name: Option<String>,
-    /// git user.email.
-    #[arg(long = "email")]
-    pub email: Option<String>,
-    /// Where to write the new SSH private key (default: ~/.ssh/id_ed25519_<name>).
-    /// An existing file at this path is reused, not overwritten.
-    #[arg(long = "ssh-key")]
-    pub ssh_key: Option<String>,
-    /// Algorithm for the generated SSH key.
-    #[arg(long = "ssh-type", value_enum, default_value_t = SshKeyType::Ed25519)]
-    pub ssh_type: SshKeyType,
-    /// Do not provision an SSH key for this profile.
-    #[arg(long = "no-ssh")]
-    pub no_ssh: bool,
-    /// Commit-signing method.
-    #[arg(long, value_enum)]
-    pub signing: Option<SigningKind>,
-    /// Existing signing key: public-key path (ssh) or key id (openpgp). When
-    /// omitted, `ssh` reuses the generated key and `openpgp` generates a GPG key.
-    #[arg(long = "signing-key")]
-    pub signing_key: Option<String>,
-    /// Sign commits by default.
-    #[arg(long = "sign-commits")]
-    pub sign_commits: bool,
-    /// Provision an isolated GH_CONFIG_DIR for this profile.
-    #[arg(long = "gh", overrides_with = "no_gh")]
-    pub gh: bool,
-    /// Do not provision a gh config dir.
-    #[arg(long = "no-gh")]
-    pub no_gh: bool,
-    /// Fail rather than prompt for missing fields; take no interactive actions.
     #[arg(long = "non-interactive")]
     pub non_interactive: bool,
 }
