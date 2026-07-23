@@ -280,6 +280,31 @@ pub fn resolve_global_path(home: &Path) -> PathBuf {
     dotfile
 }
 
+/// Whether gitid can safely write to `path` in place. A missing file counts as
+/// writable (it will be created); an existing file is writable only if it can be
+/// opened for writing. A gitconfig managed read-only by a config manager
+/// (Home-Manager / Nix symlink it into the store) fails here — the signal to
+/// divert to a writable `.local` companion rather than clobber it.
+fn is_writable_in_place(path: &Path) -> bool {
+    match std::fs::OpenOptions::new().write(true).open(path) {
+        Ok(_) => true,
+        Err(e) => e.kind() == std::io::ErrorKind::NotFound,
+    }
+}
+
+/// The writable companion path gitid diverts to when the resolved global
+/// gitconfig is read-only: the same file with `.local` appended
+/// (`~/.config/git/config` → `~/.config/git/config.local`, `~/.gitconfig` →
+/// `~/.gitconfig.local`). For git to load it, the managed global must include it.
+pub fn local_companion(path: &Path) -> PathBuf {
+    let mut name = path
+        .file_name()
+        .map(std::ffi::OsString::from)
+        .unwrap_or_default();
+    name.push(".local");
+    path.with_file_name(name)
+}
+
 /// Whether `global` (a specific gitconfig file) already includes `include_path`
 /// (compared after `~` expansion). Reads the file by path via `git config
 /// --file` so the check is deterministic regardless of process environment, with
@@ -312,26 +337,53 @@ fn global_include_present(global: &Path, home: &Path, include_path: &Path) -> Re
     }
 }
 
+/// Outcome of [`ensure_include`].
+#[derive(Debug, Clone)]
+pub struct IncludeOutcome {
+    /// Whether a new `[include]` block was appended (false = already present).
+    pub added: bool,
+    /// The file gitid wrote to (or found the include already in).
+    pub target: PathBuf,
+    /// The read-only resolved global gitconfig, set when gitid diverted to a
+    /// writable `.local` companion. `None` on the normal path.
+    pub diverted_from: Option<PathBuf>,
+}
+
 /// Ensure the user's global gitconfig includes our manifest, exactly once.
 ///
 /// Appends an `[include]` block at EOF (never via `git config --add`, which
 /// would insert into the first existing `[include]` section and could let a
-/// global `[user]` defined later win over our profile fragments). Returns
-/// whether a change was made.
-pub fn ensure_include(home: &Path, include_path: &Path) -> Result<bool> {
+/// global `[user]` defined later win over our profile fragments).
+///
+/// When the resolved global gitconfig is read-only (e.g. managed by
+/// Home-Manager / Nix, which symlink it into the store), gitid does not clobber
+/// it: it diverts to a writable `.local` companion ([`local_companion`]) and
+/// records the divert in the returned [`IncludeOutcome`], so callers can prompt
+/// the user to wire the companion into their managed config.
+pub fn ensure_include(home: &Path, include_path: &Path) -> Result<IncludeOutcome> {
     let global = resolve_global_path(home);
-    if global_include_present(&global, home, include_path)? {
-        return Ok(false);
+    let (target, diverted_from) = if is_writable_in_place(&global) {
+        (global, None)
+    } else {
+        (local_companion(&global), Some(global))
+    };
+
+    if global_include_present(&target, home, include_path)? {
+        return Ok(IncludeOutcome {
+            added: false,
+            target,
+            diverted_from,
+        });
     }
     let display_path = {
         let abs = include_path.to_string_lossy();
         contract_home(&abs, &home.to_string_lossy(), PathStyle::host())
     };
 
-    let mut content = match std::fs::read_to_string(&global) {
+    let mut content = match std::fs::read_to_string(&target) {
         Ok(t) => t,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(e) => return Err(e).with_context(|| format!("could not read {}", global.display())),
+        Err(e) => return Err(e).with_context(|| format!("could not read {}", target.display())),
     };
     if !content.is_empty() && !content.ends_with('\n') {
         content.push('\n');
@@ -343,16 +395,64 @@ pub fn ensure_include(home: &Path, include_path: &Path) -> Result<bool> {
     content.push_str("[include]\n");
     content.push_str(&format!("\tpath = {display_path}\n"));
 
-    crate::store::atomic_write(&global, &content)
-        .with_context(|| format!("could not update {}", global.display()))?;
-    Ok(true)
+    crate::store::atomic_write(&target, &content)
+        .with_context(|| format!("could not update {}", target.display()))?;
+    Ok(IncludeOutcome {
+        added: true,
+        target,
+        diverted_from,
+    })
 }
 
-/// Whether the resolved global gitconfig currently includes our manifest.
-/// Read-only; used by `doctor`.
-pub fn include_present(home: &Path, include_path: &Path) -> Result<bool> {
+/// Whether git, resolving config the way it does in the current environment,
+/// actually loads our manifest via some `include.path`. Unlike
+/// [`global_include_present`] (which inspects a single file), this reflects what
+/// git truly sees — including a `.local` companion pulled in by a managed global
+/// config. Used to decide whether a diverted include is actually effective.
+pub fn effective_include_present(home: &Path, include_path: &Path) -> Result<bool> {
+    let out = Command::new("git")
+        .args(["config", "--get-all", "include.path"])
+        .output()
+        .context("could not run `git config`")?;
+    if !out.status.success() {
+        return Ok(false);
+    }
+    let target = include_path.to_path_buf();
+    Ok(String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .any(|line| expand_tilde(line.trim(), home) == target))
+}
+
+/// Read-only classification of whether git will load the gitid manifest,
+/// mirroring [`ensure_include`]'s divert logic. Consumed by `doctor`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BootstrapStatus {
+    /// The resolved global gitconfig includes the manifest (normal case).
+    Present,
+    /// The global is read-only; gitid diverted to `local`, and git loads it.
+    PresentViaLocal { local: PathBuf },
+    /// gitid diverted to `local`, but git does not load it — the managed global
+    /// does not include the companion.
+    LocalNotLoaded { global: PathBuf, local: PathBuf },
+    /// The manifest is not included anywhere.
+    Missing,
+}
+
+/// Classify the global-include bootstrap state for `doctor`.
+pub fn bootstrap_status(home: &Path, include_path: &Path) -> Result<BootstrapStatus> {
     let global = resolve_global_path(home);
-    global_include_present(&global, home, include_path)
+    if global_include_present(&global, home, include_path)? {
+        return Ok(BootstrapStatus::Present);
+    }
+    let local = local_companion(&global);
+    if global_include_present(&local, home, include_path)? {
+        return if effective_include_present(home, include_path)? {
+            Ok(BootstrapStatus::PresentViaLocal { local })
+        } else {
+            Ok(BootstrapStatus::LocalNotLoaded { global, local })
+        };
+    }
+    Ok(BootstrapStatus::Missing)
 }
 
 /// `git -C <dir> config --get <key>`, returning `None` when unset.
@@ -655,5 +755,18 @@ mod tests {
         assert!(inc.contains("gitdir:/mnt/big/work/"));
         assert!(inc.contains("gitdir:~/work/"));
         let _ = PathBuf::new();
+    }
+
+    #[test]
+    fn local_companion_appends_local_suffix() {
+        use std::path::Path;
+        assert_eq!(
+            local_companion(Path::new("/home/jane/.config/git/config")),
+            PathBuf::from("/home/jane/.config/git/config.local")
+        );
+        assert_eq!(
+            local_companion(Path::new("/home/jane/.gitconfig")),
+            PathBuf::from("/home/jane/.gitconfig.local")
+        );
     }
 }

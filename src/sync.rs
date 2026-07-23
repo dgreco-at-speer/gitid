@@ -4,12 +4,15 @@
 //! function of them.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::PathBuf;
 
 use anyhow::{Context, Result, bail};
 use serde::Serialize;
 
-use crate::gitconfig::{ensure_include, render_fragment, render_include};
-use crate::paths::{GitidPaths, PathStyle};
+use crate::gitconfig::{
+    effective_include_present, ensure_include, render_fragment, render_include,
+};
+use crate::paths::{GitidPaths, PathStyle, contract_home};
 use crate::store::atomic_write;
 use crate::store::mappings::MappingsFile;
 use crate::store::profiles::{Profile, ProfilesFile};
@@ -25,6 +28,9 @@ pub struct SyncReport {
     pub include_changed: bool,
     pub mappings_changed: bool,
     pub global_include_added: bool,
+    /// When the resolved global gitconfig was read-only, the `.local` companion
+    /// gitid wrote the include to instead. `None` on the normal path.
+    pub global_include_local: Option<PathBuf>,
     pub dangling_mappings: Vec<String>,
     /// Non-fatal problems (e.g. an unreachable ssh-agent with a cached key).
     pub warnings: Vec<String>,
@@ -84,7 +90,28 @@ pub fn sync_all(paths: &GitidPaths) -> Result<SyncReport> {
     write_include(paths, &mappings, &mut report)?;
     provision_gh_dirs(paths, &profiles, &mut report)?;
 
-    report.global_include_added = ensure_include(&paths.home, &paths.include_gitconfig())?;
+    let outcome = ensure_include(&paths.home, &paths.include_gitconfig())?;
+    report.global_include_added = outcome.added;
+    if let Some(global) = outcome.diverted_from {
+        report.global_include_local = Some(outcome.target.clone());
+        // Only nag when git will not actually pick up the companion: a correctly
+        // wired managed config (which includes it) needs no warning.
+        if !effective_include_present(&paths.home, &paths.include_gitconfig())? {
+            let local = contract_home(
+                &outcome.target.to_string_lossy(),
+                &paths.home.to_string_lossy(),
+                PathStyle::host(),
+            );
+            report.warnings.push(format!(
+                "{} is read-only; wrote the gitid include to {} instead. git will not \
+                 load gitid profiles until your managed global config includes it \
+                 (e.g. Home-Manager `programs.git.includes = [{{ path = \"{}\"; }}]`).",
+                global.display(),
+                outcome.target.display(),
+                local,
+            ));
+        }
+    }
 
     Ok(report)
 }
