@@ -1,4 +1,5 @@
 # gitid bash hook. Add to ~/.bashrc:  eval "$(gitid hook bash)"
+export GITID_HOOK_ACTIVE=1
 _gitid_hook() {
   local _gitid_status=$?
   if [[ "${_GITID_PWD-}" != "$PWD" ]]; then
