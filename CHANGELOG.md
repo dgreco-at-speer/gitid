@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.0](https://github.com/dgreco-at-speer/gitid/compare/v0.8.0...v0.9.0) (2026-07-24)
+
+
+### Features
+
+* divert global include to writable .local when gitconfig is read-only ([236c6a1](https://github.com/dgreco-at-speer/gitid/commit/236c6a1ce2cbc90af39a0a795ccac12fef598925))
+* divert global include to writable .local when gitconfig is read… ([13d190f](https://github.com/dgreco-at-speer/gitid/commit/13d190f7acbfb47b3472f31dacfad27b283fbfdb))
+
 ## [0.8.0](https://github.com/dgreco-at-speer/gitid/compare/v0.7.0...v0.8.0) (2026-07-15)
 
 
