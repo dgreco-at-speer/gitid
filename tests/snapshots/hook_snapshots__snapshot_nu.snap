@@ -4,6 +4,7 @@ expression: "hook(\"nu\")"
 ---
 # gitid nushell hook. Save to your autoload dir:
 #   gitid hook nu | save -f ($nu.data-dir | path join vendor/autoload/gitid.nu)
+$env.GITID_HOOK_ACTIVE = '1'
 $env.config = ($env.config | upsert hooks.env_change.PWD {
   |config| ($config.hooks.env_change.PWD? | default []) ++ [{
     condition: {|| true }

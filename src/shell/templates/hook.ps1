@@ -1,5 +1,6 @@
 # gitid PowerShell hook. Add to $PROFILE:
 #   Invoke-Expression (& gitid hook powershell | Out-String)
+$env:GITID_HOOK_ACTIVE = '1'
 $script:__gitidPwd = $null
 function global:__gitid_hook {
   if ($script:__gitidPwd -ne $PWD.Path) {

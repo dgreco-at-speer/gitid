@@ -60,6 +60,10 @@ mod tests {
             let s = script(shell);
             assert!(!s.contains("{{GITID}}"), "{shell:?} still has placeholder");
             assert!(s.contains("gitid env"), "{shell:?} missing env call");
+            assert!(
+                s.contains("GITID_HOOK_ACTIVE"),
+                "{shell:?} missing GITID_HOOK_ACTIVE marker"
+            );
         }
     }
 }

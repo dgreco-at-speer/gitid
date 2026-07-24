@@ -1,4 +1,5 @@
 # gitid zsh hook. Add to ~/.zshrc:  eval "$(gitid hook zsh)"
+export GITID_HOOK_ACTIVE=1
 autoload -Uz add-zsh-hook
 _gitid_hook() {
   eval "$({{GITID}} env --shell zsh)"
