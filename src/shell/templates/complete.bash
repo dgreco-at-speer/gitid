@@ -1,0 +1,28 @@
+# gitid bash completions. Add to ~/.bashrc:  eval "$(gitid completions bash)"
+export GITID_COMPLETIONS_ACTIVE=1
+_gitid_complete() {
+  local cur subcmds
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  subcmds="add current dirs doctor edit env forget hook init list mcp remove setup show sync update use"
+  if [ "$COMP_CWORD" -eq 1 ]; then
+    COMPREPLY=( $(compgen -W "$subcmds" -- "$cur") )
+    return
+  fi
+  local sub="${COMP_WORDS[1]}"
+  case "$sub" in
+    show|edit|remove)
+      [ "$COMP_CWORD" -eq 2 ] && COMPREPLY=( $(compgen -W "$({{GITID}} __complete profiles "$cur")" -- "$cur") )
+      ;;
+    use)
+      if [ "$COMP_CWORD" -eq 2 ]; then
+        COMPREPLY=( $(compgen -W "$({{GITID}} __complete profiles "$cur")" -- "$cur") )
+      elif [ "$COMP_CWORD" -eq 3 ]; then
+        COMPREPLY=( $(compgen -d -- "$cur") )
+      fi
+      ;;
+    forget|current|doctor)
+      COMPREPLY=( $(compgen -d -- "$cur") )
+      ;;
+  esac
+}
+complete -F _gitid_complete gitid

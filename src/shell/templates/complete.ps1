@@ -1,0 +1,41 @@
+$env:GITID_COMPLETIONS_ACTIVE = '1'
+# gitid PowerShell completions. Add to $PROFILE:
+#   gitid completions powershell | Out-String | Invoke-Expression
+Register-ArgumentCompleter -Native -CommandName gitid -ScriptBlock {
+    param($wordToComplete, $commandAst, $cursorPosition)
+
+    function New-Result([string]$value) {
+        [System.Management.Automation.CompletionResult]::new($value, $value, 'ParameterValue', $value)
+    }
+
+    $elements = $commandAst.CommandElements | ForEach-Object { $_.ToString() }
+    $subcmds = @('add', 'current', 'dirs', 'doctor', 'edit', 'env', 'forget', 'hook', 'init', 'list', 'mcp', 'remove', 'setup', 'show', 'sync', 'update', 'use')
+
+    # $elements[0] is always "gitid"; $elements[1] the subcommand (once typed).
+    if ($elements.Count -le 1) {
+        $subcmds | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object { New-Result $_ }
+        return
+    }
+
+    $sub = $elements[1]
+    $argIndex = $elements.Count - 2
+
+    switch ($sub) {
+        { $_ -in @('show', 'edit', 'remove') } {
+            if ($argIndex -le 1) {
+                & {{GITID}} __complete profiles $wordToComplete | ForEach-Object { New-Result $_ }
+            }
+        }
+        'use' {
+            if ($argIndex -le 1) {
+                & {{GITID}} __complete profiles $wordToComplete | ForEach-Object { New-Result $_ }
+            }
+            elseif ($argIndex -eq 2) {
+                Get-ChildItem -Directory -Name | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object { New-Result $_ }
+            }
+        }
+        { $_ -in @('forget', 'current', 'doctor') } {
+            Get-ChildItem -Directory -Name | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object { New-Result $_ }
+        }
+    }
+}

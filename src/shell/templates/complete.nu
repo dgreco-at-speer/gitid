@@ -1,0 +1,49 @@
+$env.GITID_COMPLETIONS_ACTIVE = '1'
+# gitid nushell completions. Save to your autoload dir:
+#   gitid completions nu | save -f ($nu.data-dir | path join vendor/autoload/gitid-complete.nu)
+#
+# Dynamic completion (profile names via `gitid __complete`, directories via
+# `ls`) needs a nushell build that supports a closure-based external
+# completer (`$env.config.completions.external.completer`). On older nu this
+# file still sets the marker above and lists subcommands statically; full
+# dynamic completion is best-effort. TODO(nu): revisit once the minimum
+# supported nu version guarantees the closure form.
+
+def "nu-complete gitid subcommands" [] {
+  ["add" "current" "dirs" "doctor" "edit" "env" "forget" "hook" "init" "list" "mcp" "remove" "setup" "show" "sync" "update" "use"]
+}
+
+def "nu-complete gitid profiles" [prefix: string] {
+  (^{{GITID}} __complete profiles $prefix | lines)
+}
+
+def "nu-complete gitid dirs" [] {
+  (ls | where type == dir | get name)
+}
+
+def gitid-complete [spans: list<string>] {
+  if ($spans | get 0) != "gitid" {
+    return null
+  }
+  let cur = ($spans | last)
+  if ($spans | length) <= 2 {
+    return (nu-complete gitid subcommands | where ($it | str starts-with $cur))
+  }
+  let sub = ($spans | get 1)
+  match $sub {
+    "show" | "edit" | "remove" => (if ($spans | length) == 3 { nu-complete gitid profiles $cur } else { [] })
+    "use" => (
+      if ($spans | length) == 3 {
+        nu-complete gitid profiles $cur
+      } else if ($spans | length) == 4 {
+        nu-complete gitid dirs
+      } else {
+        []
+      }
+    )
+    "forget" | "current" | "doctor" => (nu-complete gitid dirs)
+    _ => []
+  }
+}
+
+$env.config = ($env.config | upsert completions.external.completer {|spans| gitid-complete $spans })

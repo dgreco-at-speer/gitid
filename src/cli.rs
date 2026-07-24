@@ -59,6 +59,9 @@ pub enum Command {
     Setup(SetupArgs),
     /// Print shell completions.
     Completions(CompletionsArgs),
+    /// Internal: emit completion candidates.
+    #[command(name = "__complete", hide = true)]
+    Complete(CompleteArgs),
     /// Create config dirs and bootstrap the global include.
     Init,
     /// Update gitid to the latest release.
@@ -286,6 +289,12 @@ pub struct SetupArgs {
 pub struct CompletionsArgs {
     #[arg(value_enum)]
     pub shell: Shell,
+}
+
+#[derive(Debug, Args)]
+pub struct CompleteArgs {
+    pub what: String,
+    pub current: Option<String>,
 }
 
 #[derive(Debug, Args)]
