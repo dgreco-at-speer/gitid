@@ -271,3 +271,135 @@ fn remove_refuses_when_mapped_without_force() {
         .success()
         .stdout("");
 }
+
+/// A read-only global gitconfig (e.g. managed by Home-Manager / Nix) is never
+/// clobbered: gitid diverts its include to a writable `.local` companion, and
+/// when the managed config already wires that companion in, git resolves the
+/// identity through it.
+#[cfg(unix)]
+#[test]
+fn readonly_global_diverts_include_to_local_companion() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let env = TestEnv::new();
+    let global = env.global_gitconfig();
+    let local = env.home().join(".gitconfig.local");
+    // Managed, read-only global that already wires in the `.local` companion.
+    env.write_global_gitconfig(&format!(
+        "# managed\n[include]\n\tpath = {}\n",
+        local.display()
+    ));
+    std::fs::set_permissions(&global, std::fs::Permissions::from_mode(0o444)).unwrap();
+    // Root ignores permission bits; skip where the read-only guard is a no-op.
+    if std::fs::OpenOptions::new()
+        .write(true)
+        .open(&global)
+        .is_ok()
+    {
+        return;
+    }
+
+    env.gitid()
+        .args([
+            "add",
+            "work",
+            "--non-interactive",
+            "--git-name",
+            "Work",
+            "--email",
+            "work@corp.example",
+            "--no-gh",
+        ])
+        .assert()
+        .success();
+    let tree = env.home().join("code");
+    std::fs::create_dir_all(&tree).unwrap();
+    env.gitid()
+        .args(["use", "work", tree.to_str().unwrap()])
+        .assert()
+        .success();
+
+    // The include landed in the companion, and the managed global was untouched.
+    let companion = std::fs::read_to_string(&local).unwrap();
+    assert!(
+        companion.contains("include.gitconfig"),
+        "companion:\n{companion}"
+    );
+    let managed = std::fs::read_to_string(&global).unwrap();
+    assert!(
+        !managed.contains("Added by gitid"),
+        "read-only global was clobbered:\n{managed}"
+    );
+
+    // The whole chain resolves the identity inside the mapped tree.
+    let repo = tree.join("repo");
+    env.git_init(&repo);
+    assert_eq!(
+        env.git_config_in(&repo, "user.email").as_deref(),
+        Some("work@corp.example")
+    );
+
+    // doctor is satisfied and reports resolution via the companion.
+    env.gitid()
+        .args(["doctor", repo.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("included via"));
+}
+
+/// When the managed global does not include the companion, gitid still diverts
+/// (never clobbering the read-only file) but warns that git will not load it,
+/// and `doctor` flags the same gap without failing.
+#[cfg(unix)]
+#[test]
+fn readonly_global_without_wiring_warns() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let env = TestEnv::new();
+    let global = env.global_gitconfig();
+    let local = env.home().join(".gitconfig.local");
+    env.write_global_gitconfig("# managed, no local include\n[user]\n\temail = base@x.example\n");
+    std::fs::set_permissions(&global, std::fs::Permissions::from_mode(0o444)).unwrap();
+    if std::fs::OpenOptions::new()
+        .write(true)
+        .open(&global)
+        .is_ok()
+    {
+        return;
+    }
+
+    env.gitid()
+        .args([
+            "add",
+            "work",
+            "--non-interactive",
+            "--git-name",
+            "Work",
+            "--email",
+            "work@corp.example",
+            "--no-gh",
+        ])
+        .assert()
+        .success()
+        .stderr(predicates::str::contains("is read-only"))
+        .stderr(predicates::str::contains(".gitconfig.local"));
+
+    // Divert still happened; managed global untouched.
+    assert!(
+        std::fs::read_to_string(&local)
+            .unwrap()
+            .contains("include.gitconfig")
+    );
+    assert!(
+        !std::fs::read_to_string(&global)
+            .unwrap()
+            .contains("Added by gitid")
+    );
+
+    // doctor warns (but does not fail) that git does not load the companion.
+    env.gitid()
+        .args(["doctor"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("does not load it"));
+}

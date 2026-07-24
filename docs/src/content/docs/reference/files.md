@@ -146,4 +146,18 @@ It resolves the global path the same way git does when writing: `$GIT_CONFIG_GLO
 The block is appended at end of file deliberately (rather than via `git config --add`, which would insert into the first existing `[include]` section). If a `[user]` section appeared *after* the include, it would override the profile fragments — appending at EOF keeps gitid's includes last, so mapped directories always win over your global identity.
 :::
 
+If the resolved global gitconfig is **read-only** — for example, managed by
+Home-Manager or Nix, which symlink it into the store — gitid never clobbers it.
+It writes the `[include]` block to a writable `.local` companion instead
+(`~/.config/git/config.local`, or `~/.gitconfig.local` next to `~/.gitconfig`).
+For git to actually load it, your managed config must include that companion:
+
+```nix
+# Home-Manager
+programs.git.includes = [{ path = "~/.config/git/config.local"; }];
+```
+
+`gitid doctor` reports whether git actually loads the companion, and warns when
+it does not.
+
 Every mutating command bootstraps this include if it is missing; `gitid doctor` reports whether it is present.

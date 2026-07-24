@@ -44,7 +44,7 @@ Each fragment sets `user.name`, `user.email`, `core.sshCommand`, and signing key
 
 Git itself applies the right identity to every repo under a mapped tree — no per-repo configuration, no environment variables, no shell required. Nested mappings behave the way you'd expect: the longest matching directory wins, both in gitid and in git.
 
-Your global gitconfig is touched exactly once (an append at the end of the file). Your hand-written config and comments are never rewritten.
+Your global gitconfig is touched exactly once (an append at the end of the file). Your hand-written config and comments are never rewritten. If it is read-only (e.g. managed by Home-Manager or Nix), gitid leaves it untouched and writes the include to a writable `.local` companion instead — see [Files](../../reference/files/#the-global-gitconfig-include).
 
 ## Mechanism 2: the shell hook
 

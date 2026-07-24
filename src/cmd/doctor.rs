@@ -13,8 +13,8 @@ use serde::Serialize;
 use crate::cli::DoctorArgs;
 use crate::cmd::{Ctx, resolve_dir};
 use crate::gitconfig::{
-    MIN_GIT, config_get_with_origin, git_version, include_present, is_in_repo, render_fragment,
-    render_include,
+    BootstrapStatus, MIN_GIT, bootstrap_status, config_get_with_origin, git_version, is_in_repo,
+    render_fragment, render_include,
 };
 use crate::paths::PathStyle;
 use crate::store::mappings::MappingsFile;
@@ -135,9 +135,25 @@ fn check_git(r: &mut Report) {
 
 fn check_bootstrap(ctx: &Ctx, r: &mut Report) -> Result<()> {
     let include = ctx.paths.include_gitconfig();
-    match include_present(&ctx.paths.home, &include) {
-        Ok(true) => r.check(Status::Ok, "global gitconfig includes gitid manifest", None),
-        Ok(false) => r.check(
+    match bootstrap_status(&ctx.paths.home, &include) {
+        Ok(BootstrapStatus::Present) => {
+            r.check(Status::Ok, "global gitconfig includes gitid manifest", None)
+        }
+        Ok(BootstrapStatus::PresentViaLocal { local }) => r.check(
+            Status::Ok,
+            format!("gitid manifest included via {}", local.display()),
+            None,
+        ),
+        Ok(BootstrapStatus::LocalNotLoaded { global, local }) => r.check(
+            Status::Warn,
+            format!(
+                "{} is read-only; gitid wrote its include to {} but git does not load it",
+                global.display(),
+                local.display()
+            ),
+            Some("include that file from your managed global git config"),
+        ),
+        Ok(BootstrapStatus::Missing) => r.check(
             Status::Fail,
             "global gitconfig does not include the gitid manifest",
             Some("run `gitid sync`"),

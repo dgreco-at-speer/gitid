@@ -36,7 +36,10 @@ gitid never edits your repositories. Instead it leans on two mechanisms:
 
 Your global gitconfig is touched exactly once (an append at end of file); every
 other file gitid uses is generated and fully owned by gitid, so your hand-written
-config and comments are never rewritten.
+config and comments are never rewritten. If your global gitconfig is read-only —
+e.g. managed by Home-Manager or Nix, which symlink it into the store — gitid
+leaves it untouched and writes its include to a writable `~/.config/git/config.local`
+companion instead.
 
 ### File layout
 

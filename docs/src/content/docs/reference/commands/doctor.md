@@ -23,7 +23,7 @@ gitid doctor [DIR]
 ## What it checks
 
 - **git version** — git is installed and at least the minimum supported version (2.13).
-- **Global include** — your global gitconfig contains the `[include]` line pointing at gitid's generated manifest.
+- **Global include** — your global gitconfig contains the `[include]` line pointing at gitid's generated manifest. When the global is read-only (e.g. managed by Home-Manager or Nix), gitid diverts the line to a `.local` companion; doctor confirms git actually loads it and warns when your managed config does not include the companion.
 - **Generated files** — the per-profile fragments and the include manifest match what `gitid sync` would generate from `profiles.toml` and `mappings.toml` (stale files fail).
 - **Mappings** — at least one directory mapping exists; every mapping points at a known profile (unknown profiles fail) and at a directory that still exists (missing directories warn).
 - **Git resolution probe** — if `DIR` is inside a git repository and matches a mapping, doctor asks git what `user.email` actually resolves to there. If a repo-local or other config overrides the profile's email, it warns and names the overriding file.

@@ -37,7 +37,10 @@ pub fn report_changes(report: &SyncReport) {
         output::warn(warning);
     }
     if report.global_include_added {
-        output::success("added gitid include to your global gitconfig");
+        match &report.global_include_local {
+            Some(local) => output::success(&format!("added gitid include to {}", local.display())),
+            None => output::success("added gitid include to your global gitconfig"),
+        }
     }
     if report.is_noop() {
         return;
