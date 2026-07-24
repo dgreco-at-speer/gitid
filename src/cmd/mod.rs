@@ -66,6 +66,7 @@ fn dispatch(ctx: &Ctx, command: Command) -> Result<ExitCode> {
         Command::Hook(args) => hook::run(&args)?,
         Command::Setup(args) => setup::run(ctx, &args)?,
         Command::Completions(args) => completions::run(&args)?,
+        Command::Complete(args) => return completions::complete(ctx, &args),
         Command::Init => sync::init(ctx)?,
         Command::Update(args) => return crate::update::run(ctx, &args),
         Command::Mcp(args) => match args.command {
@@ -85,6 +86,7 @@ fn should_notify(command: &Command) -> bool {
         Command::Env(_)
             | Command::Hook(_)
             | Command::Completions(_)
+            | Command::Complete(_)
             | Command::Current(_)
             | Command::Update(_)
             | Command::Mcp(_)
