@@ -209,7 +209,7 @@ impl GitidServer {
     }
 
     #[tool(
-        description = "Diagnose gitid configuration problems (git version, bootstrap, stale artifacts, mappings, ssh keys, gh, hook)."
+        description = "Diagnose gitid configuration problems (git version, bootstrap, stale artifacts, mappings, ssh keys, gh, hook, completions)."
     )]
     async fn gitid_doctor(
         &self,
@@ -219,7 +219,7 @@ impl GitidServer {
         let report = crate::cmd::doctor::collect(&ctx, p.dir.as_deref()).map_err(internal)?;
         json(&DoctorResult {
             failed: report.failed(),
-            findings: report.findings,
+            findings: report.all_findings(),
         })
     }
 
