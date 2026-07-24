@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.0](https://github.com/dgreco-at-speer/gitid/compare/v0.9.0...v0.10.0) (2026-07-24)
+
+
+### Features
+
+* **completions:** dynamic profile/dir completion via __complete backend ([fc2c4aa](https://github.com/dgreco-at-speer/gitid/commit/fc2c4aa3b95a75022164780c54267f74216484dc))
+* **completions:** dynamic profile/dir completion via __complete backend ([da8099e](https://github.com/dgreco-at-speer/gitid/commit/da8099e8f16cb15cd840a9528b4c26151d36882d))
+* **doctor:** sectioned output + hook/completions detection ([180bffb](https://github.com/dgreco-at-speer/gitid/commit/180bffb6e244175f934ff27207da3c2c139b82a8))
+* **doctor:** sectioned output + hook/completions detection ([e51cee6](https://github.com/dgreco-at-speer/gitid/commit/e51cee6342b9bf30c8e5acc9acfe5c5f44286d91))
+* **hook:** export GITID_HOOK_ACTIVE marker in all shell hooks ([8b0a44e](https://github.com/dgreco-at-speer/gitid/commit/8b0a44e71a4c185d9f9fd02a9e3c1a9481da41ba))
+* **hook:** export GITID_HOOK_ACTIVE marker in all shell hooks ([10a869c](https://github.com/dgreco-at-speer/gitid/commit/10a869c29f8de79af9866992d7468740e0a99e73))
+
 ## [0.9.0](https://github.com/dgreco-at-speer/gitid/compare/v0.8.0...v0.9.0) (2026-07-24)
 
 
